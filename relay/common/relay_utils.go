@@ -295,7 +295,7 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 		return createTaskError(err, "invalid_request", http.StatusBadRequest, true)
 	}
 
-	if taskErr := validatePrompt(req.Prompt); taskErr != nil {
+	if taskErr := validatePrompt(req.Prompt); taskErr != nil && !req.HasTextContent() {
 		return taskErr
 	}
 
