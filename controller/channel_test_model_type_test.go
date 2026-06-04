@@ -28,6 +28,44 @@ func TestBuildImageTestRequestUsesOpenAICompatibleDefaultSize(t *testing.T) {
 	}
 }
 
+func TestShouldUseTaskChannelTestForVolcEngineVideoModel(t *testing.T) {
+	ch := &model.Channel{Type: constant.ChannelTypeVolcEngine, Models: "doubao-seedance-2.0"}
+	if !shouldUseTaskChannelTest(ch, "doubao-seedance-2.0") {
+		t.Fatal("VolcEngine seedance model should use task channel test")
+	}
+}
+
+func TestBuildAgentPlanVideoTestRequestUsesDocumentedFields(t *testing.T) {
+	payload := buildAgentPlanVideoTestRequest("doubao-seedance-2.0")
+
+	if payload["model"] != "doubao-seedance-2.0" {
+		t.Fatalf("model = %v", payload["model"])
+	}
+	if _, ok := payload["draft"]; ok {
+		t.Fatal("payload should not include draft")
+	}
+	if payload["generate_audio"] != false {
+		t.Fatalf("generate_audio = %v, want false", payload["generate_audio"])
+	}
+	if payload["ratio"] != "adaptive" {
+		t.Fatalf("ratio = %v, want adaptive", payload["ratio"])
+	}
+	if payload["duration"] != 5 {
+		t.Fatalf("duration = %v, want 5", payload["duration"])
+	}
+	if payload["watermark"] != false {
+		t.Fatalf("watermark = %v, want false", payload["watermark"])
+	}
+
+	content, ok := payload["content"].([]map[string]interface{})
+	if !ok || len(content) != 1 {
+		t.Fatalf("content = %#v, want one text item", payload["content"])
+	}
+	if content[0]["type"] != "text" || content[0]["text"] == "" {
+		t.Fatalf("content[0] = %#v, want text prompt", content[0])
+	}
+}
+
 func TestEndpointTypeFromModelType(t *testing.T) {
 	cases := map[string]constant.EndpointType{
 		model.ModelTypeText:      constant.EndpointTypeOpenAI,

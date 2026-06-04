@@ -682,16 +682,21 @@ type TaskRelayInfo struct {
 }
 
 type TaskSubmitReq struct {
-	Prompt         string                 `json:"prompt"`
-	Model          string                 `json:"model,omitempty"`
-	Mode           string                 `json:"mode,omitempty"`
-	Image          string                 `json:"image,omitempty"`
-	Images         []string               `json:"images,omitempty"`
-	Size           string                 `json:"size,omitempty"`
-	Duration       int                    `json:"duration,omitempty"`
-	Seconds        string                 `json:"seconds,omitempty"`
-	InputReference string                 `json:"input_reference,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Prompt         string                   `json:"prompt"`
+	Model          string                   `json:"model,omitempty"`
+	Mode           string                   `json:"mode,omitempty"`
+	Image          string                   `json:"image,omitempty"`
+	Images         []string                 `json:"images,omitempty"`
+	Content        []map[string]interface{} `json:"content,omitempty"`
+	Size           string                   `json:"size,omitempty"`
+	Duration       int                      `json:"duration,omitempty"`
+	Seconds        string                   `json:"seconds,omitempty"`
+	InputReference string                   `json:"input_reference,omitempty"`
+	GenerateAudio  *bool                    `json:"generate_audio,omitempty"`
+	Ratio          string                   `json:"ratio,omitempty"`
+	Resolution     string                   `json:"resolution,omitempty"`
+	Watermark      *bool                    `json:"watermark,omitempty"`
+	Metadata       map[string]interface{}   `json:"metadata,omitempty"`
 }
 
 func (t *TaskSubmitReq) GetPrompt() string {
@@ -700,6 +705,17 @@ func (t *TaskSubmitReq) GetPrompt() string {
 
 func (t *TaskSubmitReq) HasImage() bool {
 	return len(t.Images) > 0
+}
+
+func (t *TaskSubmitReq) HasTextContent() bool {
+	for _, item := range t.Content {
+		if item["type"] == "text" {
+			if text, ok := item["text"].(string); ok && strings.TrimSpace(text) != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *TaskSubmitReq) UnmarshalJSON(data []byte) error {

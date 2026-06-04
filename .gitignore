@@ -40,3 +40,4 @@ skills-lock.json
 .gitignore
 35sz-api.pid
 35sz-api.log
+docker-compose.35sz.yml

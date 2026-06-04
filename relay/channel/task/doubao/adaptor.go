@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -119,9 +120,30 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	return relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate)
 }
 
+// normalizeBaseURL normalizes the base URL by trimming whitespace and trailing slashes.
+func normalizeBaseURL(baseURL string) string {
+	return strings.TrimRight(strings.TrimSpace(baseURL), "/")
+}
+
+// isVolcengineAgentPlanBase checks if the base URL is for Volcengine Agent Plan.
+func isVolcengineAgentPlanBase(baseURL string) bool {
+	baseURL = normalizeBaseURL(baseURL)
+	return baseURL == "https://ark.cn-beijing.volces.com/api/plan" ||
+		baseURL == "https://ark.cn-beijing.volces.com/api/plan/v3"
+}
+
+// buildRequestURL constructs the upstream URL, with special handling for Volcengine Agent Plan.
+func buildRequestURL(baseURL string, regularPath string, agentPlanPath string) string {
+	baseURL = normalizeBaseURL(baseURL)
+	if isVolcengineAgentPlanBase(baseURL) {
+		return baseURL + agentPlanPath
+	}
+	return baseURL + regularPath
+}
+
 // BuildRequestURL constructs the upstream URL.
 func (a *TaskAdaptor) BuildRequestURL(_ *relaycommon.RelayInfo) (string, error) {
-	return fmt.Sprintf("%s/api/v3/contents/generations/tasks", a.baseURL), nil
+	return buildRequestURL(a.baseURL, "/api/v3/contents/generations/tasks", "/contents/generations/tasks"), nil
 }
 
 // BuildRequestHeader sets required headers.
@@ -241,7 +263,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 		return nil, fmt.Errorf("invalid task_id")
 	}
 
-	uri := fmt.Sprintf("%s/api/v3/contents/generations/tasks/%s", baseUrl, taskID)
+	uri := buildRequestURL(baseUrl, fmt.Sprintf("/api/v3/contents/generations/tasks/%s", taskID), fmt.Sprintf("/contents/generations/tasks/%s", taskID))
 
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
@@ -285,20 +307,47 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		}
 	}
 
+	if len(req.Content) > 0 {
+		contentData, err := common.Marshal(req.Content)
+		if err != nil {
+			return nil, errors.Wrap(err, "marshal content failed")
+		}
+		if err := common.Unmarshal(contentData, &r.Content); err != nil {
+			return nil, errors.Wrap(err, "unmarshal content failed")
+		}
+	}
+
 	metadata := req.Metadata
 	if err := taskcommon.UnmarshalMetadata(metadata, &r); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
+	if req.GenerateAudio != nil {
+		r.GenerateAudio = lo.ToPtr(dto.BoolValue(*req.GenerateAudio))
+	}
+	if req.Ratio != "" {
+		r.Ratio = req.Ratio
+	}
+	if req.Resolution != "" {
+		r.Resolution = req.Resolution
+	}
+	if req.Watermark != nil {
+		r.Watermark = lo.ToPtr(dto.BoolValue(*req.Watermark))
+	}
+	if req.Duration > 0 {
+		r.Duration = lo.ToPtr(dto.IntValue(req.Duration))
+	}
 	if sec, _ := strconv.Atoi(req.Seconds); sec > 0 {
 		r.Duration = lo.ToPtr(dto.IntValue(sec))
 	}
 
-	r.Content = lo.Reject(r.Content, func(c ContentItem, _ int) bool { return c.Type == "text" })
-	r.Content = append(r.Content, ContentItem{
-		Type: "text",
-		Text: req.Prompt,
-	})
+	if strings.TrimSpace(req.Prompt) != "" {
+		r.Content = lo.Reject(r.Content, func(c ContentItem, _ int) bool { return c.Type == "text" })
+		r.Content = append(r.Content, ContentItem{
+			Type: "text",
+			Text: req.Prompt,
+		})
+	}
 
 	return &r, nil
 }

@@ -74,6 +74,133 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	return rootUser.Id, nil
 }
 
+func shouldUseTaskChannelTest(channel *model.Channel, testModel string) bool {
+	if channel == nil {
+		return false
+	}
+	if channel.Type == constant.ChannelTypeDoubaoVideo || channel.Type == constant.ChannelTypeKling || channel.Type == constant.ChannelTypeJimeng || channel.Type == constant.ChannelTypeVidu || channel.Type == constant.ChannelTypeSora || channel.Type == constant.ChannelTypeMiniMax {
+		return true
+	}
+	if channel.Type == constant.ChannelTypeVolcEngine {
+		modelName := strings.ToLower(strings.TrimSpace(testModel))
+		if modelName == "" {
+			models := channel.GetModels()
+			if len(models) > 0 {
+				modelName = strings.ToLower(strings.TrimSpace(models[0]))
+			}
+		}
+		if strings.Contains(modelName, "seedance") || model.NormalizeModelType(getModelTypeForTest(testModel)) == model.ModelTypeVideo {
+			return true
+		}
+	}
+	return false
+}
+
+func buildAgentPlanVideoTestRequest(modelName string) map[string]interface{} {
+	return map[string]interface{}{
+		"model": modelName,
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": "一只小猫在草地上奔跑，阳光明媚，镜头平稳",
+			},
+		},
+		"generate_audio": false,
+		"ratio":          "adaptive",
+		"duration":       5,
+		"watermark":      false,
+	}
+}
+
+// testTaskChannel 用于测试任务型渠道（如豆包视频）的 API 连通性
+func testTaskChannel(channel *model.Channel, testUserID int, testModel string) testResult {
+	// 对于任务型渠道，我们进行简单的 API Key 验证测试
+	baseURL := constant.ChannelBaseURLs[channel.Type]
+	if channel.GetBaseURL() != "" {
+		baseURL = channel.GetBaseURL()
+	}
+
+	// 对于测试，我们尝试构建一个最小的有效请求
+	// 以验证 API Key 和端点是否正确工作
+
+	// 首先，确定模型名称
+	modelName := testModel
+	if modelName == "" {
+		if channel.TestModel != nil && *channel.TestModel != "" {
+			modelName = strings.TrimSpace(*channel.TestModel)
+		} else {
+			models := channel.GetModels()
+			if len(models) > 0 {
+				modelName = strings.TrimSpace(models[0])
+			} else {
+				// 使用默认的视频生成模型
+				modelName = "doubao-seedance-2-0-260128"
+			}
+		}
+	}
+
+	// 构建一个与火山 Agent Plan 视频生成示例一致的最小有效请求。
+	testRequest := buildAgentPlanVideoTestRequest(modelName)
+
+	reqBody, err := json.Marshal(testRequest)
+	if err != nil {
+		return testResult{
+			localErr: fmt.Errorf("failed to marshal test request: %w", err),
+		}
+	}
+
+	// 构建请求 URL
+	var requestURL string
+	// 检测是否是火山 Agent Plan 基础 URL
+	normalizedBase := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if normalizedBase == "https://ark.cn-beijing.volces.com/api/plan" || normalizedBase == "https://ark.cn-beijing.volces.com/api/plan/v3" {
+		requestURL = normalizedBase + "/contents/generations/tasks"
+	} else {
+		requestURL = normalizedBase + "/api/v3/contents/generations/tasks"
+	}
+
+	// 创建 HTTP POST 请求
+	req, err := http.NewRequest("POST", requestURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return testResult{
+			localErr: fmt.Errorf("create test request failed: %w", err),
+		}
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+channel.Key)
+
+	// 发送请求（使用较短超时）
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return testResult{
+			localErr: fmt.Errorf("API request failed: %w", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	respBody, _ := io.ReadAll(resp.Body)
+
+	// 检查响应状态码 - 对于视频生成，接受 200 和 202（已接受）
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return testResult{
+			localErr: fmt.Errorf("bad response status code: %d, body: %s", resp.StatusCode, string(respBody)),
+		}
+	}
+
+	// 连通性测试通过
+	return testResult{
+		localErr:    nil,
+		newAPIError: nil,
+	}
+}
+
 func testChannel(channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) testResult {
 	tik := time.Now()
 	var unsupportedTestChannelTypes = []int{
@@ -82,7 +209,6 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		constant.ChannelTypeSunoAPI,
 		constant.ChannelTypeKling,
 		constant.ChannelTypeJimeng,
-		constant.ChannelTypeDoubaoVideo,
 		constant.ChannelTypeVidu,
 	}
 	if lo.Contains(unsupportedTestChannelTypes, channel.Type) {
@@ -91,6 +217,12 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 			localErr: fmt.Errorf("%s channel test is not supported", channelTypeName),
 		}
 	}
+
+	if shouldUseTaskChannelTest(channel, testModel) {
+		// 对于任务型渠道或火山视频模型，我们进行简单的 API 连通性测试
+		return testTaskChannel(channel, testUserID, testModel)
+	}
+
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
