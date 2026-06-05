@@ -181,10 +181,7 @@ export function PaymentMethodDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className='space-y-4'
-          >
+          <div className='space-y-4'>
             <FormField
               control={form.control}
               name='name'
@@ -290,11 +287,14 @@ export function PaymentMethodDialog({
               >
                 {t('Cancel')}
               </Button>
-              <Button type='submit'>
+              <Button
+                type='button'
+                onClick={() => form.handleSubmit(handleSubmit)()}
+              >
                 {isEditMode ? t('Update') : t('Add')}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </Form>
       </DialogContent>
     </Dialog>

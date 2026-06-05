@@ -21,7 +21,7 @@ import * as z from 'zod'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Code2, Eye, ShieldAlert } from 'lucide-react'
+import { Code2, Eye, Save, ShieldAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -42,14 +42,20 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
 import {
   confirmPaymentCompliance,
   createPaymentConfig,
-  getPaymentConfigByProvider,
   getPaymentConfigs,
   updatePaymentConfig,
 } from '../api'
@@ -78,11 +84,7 @@ import {
   type WaffoPancakeBinding,
   type WaffoPancakeSettingsValues,
 } from './waffo-pancake-settings-section'
-import type {
-  PaymentConfig,
-  PaymentConfigProvider,
-} from '../types'
-import { PaymentConfigDialog } from './payment-config-dialog'
+import type { PaymentConfig } from '../types'
 import {
   type PayMethod,
   WaffoSettingsSection,
@@ -188,6 +190,23 @@ type PaymentComplianceDefaults = {
   confirmedBy: number
 }
 
+function GatewaySwitchRow(props: {
+  title: string
+  description: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <SettingsSwitchItem>
+      <SettingsSwitchContent>
+        <FormLabel>{props.title}</FormLabel>
+        <FormDescription>{props.description}</FormDescription>
+      </SettingsSwitchContent>
+      <Switch checked={props.checked} onCheckedChange={props.onCheckedChange} />
+    </SettingsSwitchItem>
+  )
+}
+
 type PaymentSettingsSectionProps = {
   defaultValues: PaymentBaseFormValues
   waffoDefaultValues: WaffoSettingsValues
@@ -204,6 +223,38 @@ function parseWaffoPayMethods(value: string): PayMethod[] {
   } catch {
     return []
   }
+}
+
+const paymentConfigComparableFields: Array<keyof PaymentConfig> = [
+  'name',
+  'display_name',
+  'icon_url',
+  'enabled',
+  'sort_order',
+  'app_id',
+  'app_private_key',
+  'alipay_public_key',
+  'alipay_app_public_cert',
+  'alipay_public_cert',
+  'alipay_root_cert',
+  'wechat_app_id',
+  'wechat_mch_id',
+  'wechat_api_key',
+  'wechat_serial_no',
+  'wechat_private_key',
+  'gateway_url',
+  'notify_url',
+  'return_url',
+]
+
+function hasPaymentConfigChanges(
+  current: Partial<PaymentConfig>,
+  saved: PaymentConfig | null
+) {
+  if (!saved) return Boolean(current.enabled)
+  return paymentConfigComparableFields.some(
+    (field) => (current[field] ?? '') !== (saved[field] ?? '')
+  )
 }
 
 export function PaymentSettingsSection({
@@ -239,6 +290,49 @@ export function PaymentSettingsSection({
   const [creemProductsVisualMode, setCreemProductsVisualMode] =
     React.useState(true)
   const [showComplianceDialog, setShowComplianceDialog] = React.useState(false)
+  const [activePaymentGateway, setActivePaymentGateway] = React.useState('epay')
+  const [epayEnabled, setEpayEnabled] = React.useState(() =>
+    Boolean(
+      initialFormValues.PayAddress ||
+        initialFormValues.EpayId ||
+        initialFormValues.EpayKey
+    )
+  )
+  const [stripeEnabled, setStripeEnabled] = React.useState(() =>
+    Boolean(
+      initialFormValues.StripeApiSecret ||
+      initialFormValues.StripePriceId
+    )
+  )
+  const [creemEnabled, setCreemEnabled] = React.useState(() =>
+    Boolean(
+      initialFormValues.CreemApiKey ||
+      initialFormValues.CreemProducts
+    )
+  )
+  // Waffo already has WaffoEnabled in form values
+  const [waffoPancakeEnabled, setWaffoPancakeEnabled] = React.useState(() =>
+    Boolean(
+      initialFormValues.WaffoPancakeMerchantID ||
+      waffoPancakeProvisionedStoreID
+    )
+  )
+  const [alipayConfig, setAlipayConfig] = React.useState<PaymentConfig | null>(null)
+  const [wechatConfig, setWechatConfig] = React.useState<PaymentConfig | null>(null)
+  const [alipayForm, setAlipayForm] = React.useState<Partial<PaymentConfig>>({
+    provider: 'alipay',
+    name: 'Alipay',
+    display_name: '支付宝',
+    enabled: false,
+    sort_order: 10,
+  })
+  const [wechatForm, setWechatForm] = React.useState<Partial<PaymentConfig>>({
+    provider: 'wxpay',
+    name: 'WeChat Pay',
+    display_name: '微信支付',
+    enabled: false,
+    sort_order: 20,
+  })
   const [waffoPayMethods, setWaffoPayMethods] = React.useState<PayMethod[]>(
     () => parseWaffoPayMethods(waffoDefaultValues.WaffoPayMethods)
   )
@@ -252,12 +346,6 @@ export function PaymentSettingsSection({
       storeID: waffoPancakeProvisionedStoreID ?? '',
       productID: waffoPancakeProvisionedProductID ?? '',
     })
-  const [paymentConfigDialogOpen, setPaymentConfigDialogOpen] =
-    React.useState(false)
-  const [currentPaymentProvider, setCurrentPaymentProvider] =
-    React.useState<PaymentConfigProvider>('alipay')
-  const [editingPaymentConfig, setEditingPaymentConfig] =
-    React.useState<PaymentConfig | null>(null)
 
   const { data: paymentConfigs = [], refetch: refetchPaymentConfigs } = useQuery({
     queryKey: ['payment-configs'],
@@ -289,6 +377,19 @@ export function PaymentSettingsSection({
       toast.error(error.message || t('Failed to save payment configuration'))
     },
   })
+
+  React.useEffect(() => {
+    const alipay = paymentConfigs.find(c => c.provider === 'alipay')
+    const wechat = paymentConfigs.find(c => c.provider === 'wxpay')
+    if (alipay) {
+      setAlipayConfig(alipay)
+      setAlipayForm(alipay)
+    }
+    if (wechat) {
+      setWechatConfig(wechat)
+      setWechatForm(wechat)
+    }
+  }, [paymentConfigs])
 
   React.useEffect(() => {
     setWaffoPayMethods(parseWaffoPayMethods(waffoDefaultValues.WaffoPayMethods))
@@ -390,6 +491,11 @@ export function PaymentSettingsSection({
   })
 
   const { isSubmitting } = form.formState
+  const isPaymentSaving =
+    updateOption.isPending ||
+    createPaymentConfigMutation.isPending ||
+    updatePaymentConfigMutation.isPending ||
+    isSubmitting
 
   const setPaymentValue = React.useCallback(
     (
@@ -433,6 +539,42 @@ export function PaymentSettingsSection({
     },
     [setPaymentValue]
   )
+
+  const saveAlipayConfig = async () => {
+    if (!alipayForm.provider) return
+    try {
+      if (alipayConfig?.id) {
+        await updatePaymentConfigMutation.mutateAsync({
+          id: alipayConfig.id,
+          data: alipayForm as PaymentConfig,
+        })
+      } else {
+        await createPaymentConfigMutation.mutateAsync(alipayForm as PaymentConfig)
+      }
+      toast.success(t('Alipay configuration saved successfully'))
+      await refetchPaymentConfigs()
+    } catch (error) {
+      toast.error(t('Failed to save Alipay configuration'))
+    }
+  }
+
+  const saveWechatConfig = async () => {
+    if (!wechatForm.provider) return
+    try {
+      if (wechatConfig?.id) {
+        await updatePaymentConfigMutation.mutateAsync({
+          id: wechatConfig.id,
+          data: wechatForm as PaymentConfig,
+        })
+      } else {
+        await createPaymentConfigMutation.mutateAsync(wechatForm as PaymentConfig)
+      }
+      toast.success(t('WeChat Pay configuration saved successfully'))
+      await refetchPaymentConfigs()
+    } catch (error) {
+      toast.error(t('Failed to save WeChat Pay configuration'))
+    }
+  }
 
   React.useEffect(() => {
     const parsedDefaults = JSON.parse(defaultsSignature) as PaymentFormValues
@@ -737,14 +879,29 @@ export function PaymentSettingsSection({
       sanitized.WaffoPancakeReturnURL !== initial.WaffoPancakeReturnURL ||
       waffoPancakeSelection.storeID !== waffoPancakeSavedBinding.storeID ||
       waffoPancakeSelection.productID !== waffoPancakeSavedBinding.productID
+    const hasAlipayChanges = hasPaymentConfigChanges(alipayForm, alipayConfig)
+    const hasWechatChanges = hasPaymentConfigChanges(wechatForm, wechatConfig)
 
-    if (updates.length === 0 && !hasWaffoPancakeChanges) {
+    if (
+      updates.length === 0 &&
+      !hasWaffoPancakeChanges &&
+      !hasAlipayChanges &&
+      !hasWechatChanges
+    ) {
       toast.info(t('No changes to save'))
       return
     }
 
     for (const update of updates) {
       await updateOption.mutateAsync(update)
+    }
+
+    if (hasAlipayChanges) {
+      await saveAlipayConfig()
+    }
+
+    if (hasWechatChanges) {
+      await saveWechatConfig()
     }
 
     if (!hasWaffoPancakeChanges) {
@@ -903,7 +1060,7 @@ export function PaymentSettingsSection({
         >
           <SettingsPageFormActions
             onSave={form.handleSubmit(onSubmit)}
-            isSaving={updateOption.isPending || isSubmitting}
+            isSaving={isPaymentSaving}
             saveLabel='Save all settings'
           />
           <div className='space-y-4'>
@@ -962,62 +1119,6 @@ export function PaymentSettingsSection({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name='PayMethods'
-              render={({ field }) => (
-                <FormItem>
-                  <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                    <FormLabel>{t('Payment methods')}</FormLabel>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() =>
-                        setPayMethodsVisualMode(!payMethodsVisualMode)
-                      }
-                      className='w-full sm:w-auto'
-                    >
-                      {payMethodsVisualMode ? (
-                        <>
-                          <Code2 className='mr-2 h-3 w-3' />
-                          {t('JSON Editor')}
-                        </>
-                      ) : (
-                        <>
-                          <Eye className='mr-2 h-3 w-3' />
-                          {t('Visual Editor')}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <FormControl>
-                    {payMethodsVisualMode ? (
-                      <PaymentMethodsVisualEditor
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
-                    ) : (
-                      <Textarea
-                        rows={4}
-                        placeholder={t(
-                          '[{"name":"支付宝","type":"alipay","color":"#1677FF"}]'
-                        )}
-                        {...field}
-                        onChange={(event) => field.onChange(event.target.value)}
-                      />
-                    )}
-                  </FormControl>
-                  <FormDescription>
-                    {t(
-                      'Configure available payment methods. Provide a JSON array.'
-                    )}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className='grid gap-6 md:grid-cols-2 md:items-start'>
               <FormField
                 control={form.control}
@@ -1066,7 +1167,10 @@ export function PaymentSettingsSection({
                       )}
                     </FormControl>
                     <FormDescription>
-                      {t('Preset recharge amounts (JSON array)')}
+                      {t('Preset recharge amounts (JSON array)')}{' '}
+                      {t(
+                        'Displayed on the wallet page only when at least one amount-based payment gateway is enabled.'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1132,13 +1236,55 @@ export function PaymentSettingsSection({
           <Separator />
 
           <div className='space-y-4'>
-            <div>
-              <h3 className='text-lg font-medium'>{t('Epay Gateway')}</h3>
-              <p className='text-muted-foreground text-sm'>
-                {t('Configuration for Epay payment integration')}
-              </p>
+            <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+              <div>
+                <h3 className='text-lg font-medium'>{t('Payment Channels')}</h3>
+                <p className='text-muted-foreground text-sm'>
+                  {t('Enable a payment channel first, then fill in the required configuration fields.')}
+                </p>
+              </div>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={form.handleSubmit(onSubmit)}
+                disabled={isPaymentSaving}
+                className='w-full sm:w-auto'
+              >
+                <Save className='mr-2 h-3 w-3' />
+                {isPaymentSaving
+                  ? t('Saving...')
+                  : t('Save payment channel settings')}
+              </Button>
             </div>
 
+            <Tabs value={activePaymentGateway} onValueChange={setActivePaymentGateway}>
+              <TabsList className='grid w-full grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7'>
+                <TabsTrigger value='epay'>{t('Epay')}</TabsTrigger>
+                <TabsTrigger value='alipay'>{t('Alipay')}</TabsTrigger>
+                <TabsTrigger value='wechat'>{t('WeChat Pay')}</TabsTrigger>
+                <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
+                <TabsTrigger value='creem'>{t('Creem')}</TabsTrigger>
+                <TabsTrigger value='waffo'>{t('Waffo')}</TabsTrigger>
+                <TabsTrigger value='waffo-pancake'>{t('Waffo Pancake')}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value='epay' className='space-y-4 pt-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>{t('Epay Gateway')}</h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t('Configuration for Epay payment integration')}
+                  </p>
+                </div>
+                <GatewaySwitchRow
+                  title={t('Enable Epay Gateway')}
+                  description={t('Enable legacy Epay payment methods for wallet recharge.')}
+                  checked={epayEnabled}
+                  onCheckedChange={setEpayEnabled}
+                />
+
+                {epayEnabled && (
+                  <>
             <div className='grid gap-6 md:grid-cols-2'>
               <FormField
                 control={form.control}
@@ -1228,109 +1374,327 @@ export function PaymentSettingsSection({
                 )}
               />
             </div>
-          </div>
 
-          <Separator />
-
-          <div className='space-y-4'>
-            <div>
-              <h3 className='text-lg font-medium'>
-                {t('Alipay and WeChat Pay Gateways')}
-              </h3>
-              <p className='text-muted-foreground text-sm'>
-                {t(
-                  'Configure native payment gateways for wallet recharge and subscription purchase.'
-                )}
-              </p>
-            </div>
-            <div className='grid gap-3 md:grid-cols-2'>
-              {(
-                [
-                  {
-                    provider: 'alipay' as const,
-                    title: t('Alipay'),
-                    description: t('Website and mobile web payment'),
-                  },
-                  {
-                    provider: 'wxpay' as const,
-                    title: t('WeChat Pay'),
-                    description: t('Native QR code and H5 payment'),
-                  },
-                ] satisfies Array<{
-                  provider: PaymentConfigProvider
-                  title: string
-                  description: string
-                }>
-              ).map((item) => {
-                const config = paymentConfigs.find(
-                  (candidate) => candidate.provider === item.provider
-                )
-                return (
-                  <div
-                    key={item.provider}
-                    className='rounded-lg border p-4 space-y-3'
-                  >
-                    <div className='flex items-start justify-between gap-3'>
-                      <div>
-                        <div className='font-medium'>{item.title}</div>
-                        <div className='text-muted-foreground text-sm'>
-                          {item.description}
-                        </div>
-                      </div>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs',
-                          config?.enabled
-                            ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-                            : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {config?.enabled ? t('Enabled') : t('Disabled')}
-                      </span>
-                    </div>
-                    <div className='text-muted-foreground text-xs'>
-                      {config
-                        ? t('Configured as {{name}}', {
-                            name: config.display_name || config.name,
-                          })
-                        : t('Not configured')}
-                    </div>
+            <FormField
+              control={form.control}
+              name='PayMethods'
+              render={({ field }) => (
+                <FormItem>
+                  <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                    <FormLabel>{t('Epay payment methods')}</FormLabel>
                     <Button
                       type='button'
                       variant='outline'
                       size='sm'
-                      onClick={async () => {
-                        setCurrentPaymentProvider(item.provider)
-                        try {
-                          const response = await getPaymentConfigByProvider(
-                            item.provider
-                          )
-                          setEditingPaymentConfig(response.data || null)
-                        } catch {
-                          setEditingPaymentConfig(null)
-                        }
-                        setPaymentConfigDialogOpen(true)
-                      }}
+                      onClick={() =>
+                        setPayMethodsVisualMode(!payMethodsVisualMode)
+                      }
+                      className='w-full sm:w-auto'
                     >
-                      {t('Configure')}
+                      {payMethodsVisualMode ? (
+                        <>
+                          <Code2 className='mr-2 h-3 w-3' />
+                          {t('JSON Editor')}
+                        </>
+                      ) : (
+                        <>
+                          <Eye className='mr-2 h-3 w-3' />
+                          {t('Visual Editor')}
+                        </>
+                      )}
                     </Button>
                   </div>
-                )
-              })}
+                  <FormControl>
+                    {payMethodsVisualMode ? (
+                      <PaymentMethodsVisualEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    ) : (
+                      <Textarea
+                        rows={4}
+                        placeholder={t(
+                          '[{"name":"支付宝","type":"alipay","color":"#1677FF"}]'
+                        )}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    )}
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Only used by the legacy Epay gateway. Native Alipay and WeChat Pay are configured in their own gateway tabs.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+                  </>
+                )}
+          </TabsContent>
+
+          <TabsContent value='alipay' className='space-y-4 pt-4'>
+            <div>
+              <h3 className='text-lg font-medium'>
+                {t('Alipay Gateway')}
+              </h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configure Alipay merchant credentials for wallet recharge.')}
+              </p>
             </div>
-          </div>
+            <GatewaySwitchRow
+              title={t('Enable Alipay')}
+              description={t('Enable Alipay payment method for wallet top-up.')}
+              checked={alipayForm.enabled ?? false}
+              onCheckedChange={(checked) => setAlipayForm(prev => ({ ...prev, enabled: checked }))}
+            />
 
-          <Separator />
+            {(alipayForm.enabled || alipayConfig?.enabled) ? (
+              <div className='space-y-4 pt-2'>
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label>{t('Display name')}</Label>
+                    <Input
+                      value={alipayForm.display_name || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, display_name: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Sort order')}</Label>
+                    <Input
+                      type='number'
+                      value={alipayForm.sort_order ?? 10}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, sort_order: Number(event.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
 
-          <div className='space-y-4'>
+                <div className='space-y-2'>
+                  <Label>{t('Icon URL')}</Label>
+                  <Input
+                    value={alipayForm.icon_url || ''}
+                    onChange={(event) => setAlipayForm(prev => ({ ...prev, icon_url: event.target.value }))}
+                    placeholder='https://example.com/payment-icon.png'
+                  />
+                </div>
+
+                <div className='space-y-2'>
+                  <Label>{t('App ID')}</Label>
+                  <Input
+                    value={alipayForm.app_id || ''}
+                    onChange={(event) => setAlipayForm(prev => ({ ...prev, app_id: event.target.value }))}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label>{t('App private key')}</Label>
+                  <Textarea
+                    rows={4}
+                    value={alipayForm.app_private_key || ''}
+                    onChange={(event) => setAlipayForm(prev => ({ ...prev, app_private_key: event.target.value }))}
+                    placeholder={alipayConfig ? t('Leave blank to keep the existing key') : t('Enter App private key')}
+                    className='font-mono text-xs'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label>{t('Alipay public key')}</Label>
+                  <Textarea
+                    rows={4}
+                    value={alipayForm.alipay_public_key || ''}
+                    onChange={(event) => setAlipayForm(prev => ({ ...prev, alipay_public_key: event.target.value }))}
+                    className='font-mono text-xs'
+                  />
+                </div>
+                <div className='grid gap-4 sm:grid-cols-3'>
+                  <div className='space-y-2'>
+                    <Label>{t('App public cert')}</Label>
+                    <Textarea
+                      rows={3}
+                      value={alipayForm.alipay_app_public_cert || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, alipay_app_public_cert: event.target.value }))}
+                      className='font-mono text-xs'
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Alipay public cert')}</Label>
+                    <Textarea
+                      rows={3}
+                      value={alipayForm.alipay_public_cert || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, alipay_public_cert: event.target.value }))}
+                      className='font-mono text-xs'
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Alipay root cert')}</Label>
+                    <Textarea
+                      rows={3}
+                      value={alipayForm.alipay_root_cert || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, alipay_root_cert: event.target.value }))}
+                      className='font-mono text-xs'
+                    />
+                  </div>
+                </div>
+
+                <div className='grid gap-4 sm:grid-cols-3'>
+                  <div className='space-y-2'>
+                    <Label>{t('Gateway URL')}</Label>
+                    <Input
+                      value={alipayForm.gateway_url || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, gateway_url: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Notify URL')}</Label>
+                    <Input
+                      value={alipayForm.notify_url || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, notify_url: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Return URL')}</Label>
+                    <Input
+                      value={alipayForm.return_url || ''}
+                      onChange={(event) => setAlipayForm(prev => ({ ...prev, return_url: event.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </TabsContent>
+
+          <TabsContent value='wechat' className='space-y-4 pt-4'>
+            <div>
+              <h3 className='text-lg font-medium'>
+                {t('WeChat Pay Gateway')}
+              </h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configure WeChat Pay merchant credentials for wallet recharge.')}
+              </p>
+            </div>
+            <GatewaySwitchRow
+              title={t('Enable WeChat Pay')}
+              description={t('Enable WeChat Pay payment method for wallet top-up.')}
+              checked={wechatForm.enabled ?? false}
+              onCheckedChange={(checked) => setWechatForm(prev => ({ ...prev, enabled: checked }))}
+            />
+
+            {(wechatForm.enabled || wechatConfig?.enabled) ? (
+              <div className='space-y-4 pt-2'>
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label>{t('Display name')}</Label>
+                    <Input
+                      value={wechatForm.display_name || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, display_name: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Sort order')}</Label>
+                    <Input
+                      type='number'
+                      value={wechatForm.sort_order ?? 20}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, sort_order: Number(event.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+
+                <div className='space-y-2'>
+                  <Label>{t('Icon URL')}</Label>
+                  <Input
+                    value={wechatForm.icon_url || ''}
+                    onChange={(event) => setWechatForm(prev => ({ ...prev, icon_url: event.target.value }))}
+                    placeholder='https://example.com/payment-icon.png'
+                  />
+                </div>
+
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label>{t('App ID')}</Label>
+                    <Input
+                      value={wechatForm.wechat_app_id || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_app_id: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Merchant ID')}</Label>
+                    <Input
+                      value={wechatForm.wechat_mch_id || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_mch_id: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className='grid gap-4 sm:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label>{t('APIv3 Key')}</Label>
+                    <Input
+                      type='password'
+                      value={wechatForm.wechat_api_key || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_api_key: event.target.value }))}
+                      placeholder={wechatConfig ? t('Leave blank to keep the existing key') : t('Enter APIv3 Key')}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Certificate Serial No')}</Label>
+                    <Input
+                      value={wechatForm.wechat_serial_no || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_serial_no: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className='space-y-2'>
+                  <Label>{t('Merchant private key')}</Label>
+                  <Textarea
+                    rows={4}
+                    value={wechatForm.wechat_private_key || ''}
+                    onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_private_key: event.target.value }))}
+                    className='font-mono text-xs'
+                  />
+                </div>
+
+                <div className='grid gap-4 sm:grid-cols-3'>
+                  <div className='space-y-2'>
+                    <Label>{t('Gateway URL')}</Label>
+                    <Input
+                      value={wechatForm.gateway_url || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, gateway_url: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Notify URL')}</Label>
+                    <Input
+                      value={wechatForm.notify_url || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, notify_url: event.target.value }))}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>{t('Return URL')}</Label>
+                    <Input
+                      value={wechatForm.return_url || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, return_url: event.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </TabsContent>
+
+          <TabsContent value='stripe' className='space-y-4 pt-4'>
             <div>
               <h3 className='text-lg font-medium'>{t('Stripe Gateway')}</h3>
               <p className='text-muted-foreground text-sm'>
                 {t('Configuration for Stripe payment integration')}
               </p>
             </div>
+            <GatewaySwitchRow
+              title={t('Enable Stripe')}
+              description={t('Enable Stripe payment method for wallet top-up.')}
+              checked={stripeEnabled}
+              onCheckedChange={setStripeEnabled}
+            />
 
-            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+            {stripeEnabled ? (
+              <>
+                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
               <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
               <ul className='list-inside list-disc space-y-1'>
                 <li>
@@ -1502,19 +1866,27 @@ export function PaymentSettingsSection({
                 )}
               />
             </div>
-          </div>
+              </>
+            ) : null}
+          </TabsContent>
 
-          <Separator />
-
-          <div className='space-y-4'>
+          <TabsContent value='creem' className='space-y-4 pt-4'>
             <div>
               <h3 className='text-lg font-medium'>{t('Creem Gateway')}</h3>
               <p className='text-muted-foreground text-sm'>
                 {t('Configuration for Creem payment integration')}
               </p>
             </div>
+            <GatewaySwitchRow
+              title={t('Enable Creem')}
+              description={t('Enable Creem payment method for wallet top-up.')}
+              checked={creemEnabled}
+              onCheckedChange={setCreemEnabled}
+            />
 
-            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+            {creemEnabled ? (
+              <>
+                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
               <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
               <ul className='list-inside list-disc space-y-1'>
                 <li>
@@ -1649,46 +2021,52 @@ export function PaymentSettingsSection({
                 </FormItem>
               )}
             />
-          </div>
+              </>
+            ) : null}
+          </TabsContent>
 
-          <Separator />
+          <TabsContent value='waffo-pancake' className='space-y-4 pt-4'>
+            <GatewaySwitchRow
+              title={t('Enable Waffo Pancake')}
+              description={t('Enable Waffo Pancake MoR for wallet top-up.')}
+              checked={waffoPancakeEnabled}
+              onCheckedChange={setWaffoPancakeEnabled}
+            />
 
-          <WaffoPancakeSettingsSection
-            defaultValues={waffoPancakeDefaultValues}
-            values={waffoPancakeValues}
-            onValueChange={setWaffoPancakeValue}
-            selectedBinding={waffoPancakeSelection}
-            savedBinding={waffoPancakeSavedBinding}
-            onSelectedBindingChange={setWaffoPancakeSelection}
-          />
+            {waffoPancakeEnabled ? (
+              <WaffoPancakeSettingsSection
+                defaultValues={waffoPancakeDefaultValues}
+                values={waffoPancakeValues}
+                onValueChange={setWaffoPancakeValue}
+                selectedBinding={waffoPancakeSelection}
+                savedBinding={waffoPancakeSavedBinding}
+                onSelectedBindingChange={setWaffoPancakeSelection}
+              />
+            ) : null}
+          </TabsContent>
 
-          <Separator />
+          <TabsContent value='waffo' className='space-y-4 pt-4'>
+            <GatewaySwitchRow
+              title={t('Enable Waffo')}
+              description={t('Enable Waffo payment aggregator for wallet top-up.')}
+              checked={currentFormValues.WaffoEnabled}
+              onCheckedChange={(checked) => setPaymentValue('WaffoEnabled', checked)}
+            />
 
-          <WaffoSettingsSection
-            values={waffoValues}
-            onValueChange={setWaffoValue}
-            payMethods={waffoPayMethods}
-            onPayMethodsChange={setWaffoPayMethods}
-          />
+            {currentFormValues.WaffoEnabled ? (
+              <WaffoSettingsSection
+                values={waffoValues}
+                onValueChange={setWaffoValue}
+                payMethods={waffoPayMethods}
+                onPayMethodsChange={setWaffoPayMethods}
+              />
+            ) : null}
+          </TabsContent>
+        </Tabs>
+      </div>
         </SettingsForm>
       </Form>
     </SettingsSection>
-    <PaymentConfigDialog
-      open={paymentConfigDialogOpen}
-      onOpenChange={setPaymentConfigDialogOpen}
-      provider={currentPaymentProvider}
-      editData={editingPaymentConfig}
-      onSave={async (config) => {
-        if (config.id) {
-          await updatePaymentConfigMutation.mutateAsync({
-            id: config.id,
-            data: config,
-          })
-        } else {
-          await createPaymentConfigMutation.mutateAsync(config)
-        }
-      }}
-    />
     </>
   )
 }
