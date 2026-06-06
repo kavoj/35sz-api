@@ -44,7 +44,7 @@ function SubscriptionsContent() {
               <Info className='h-4 w-4' />
               <AlertDescription className='text-xs'>
                 {t(
-                  'Stripe/Creem requires creating products on the third-party platform and entering the ID'
+                  'Enabled third-party payment channels may require provider-specific product IDs. Waffo Pancake can create one automatically; Stripe and Creem currently require IDs from their dashboards.'
                 )}
               </AlertDescription>
             </Alert>

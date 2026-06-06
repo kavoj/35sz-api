@@ -34,6 +34,11 @@ type SubscriptionsContextType = {
   refreshTrigger: number
   triggerRefresh: () => void
   complianceConfirmed: boolean
+  subscriptionPaymentAvailability: {
+    stripe: boolean
+    creem: boolean
+    waffoPancake: boolean
+  }
 }
 
 const SubscriptionsContext =
@@ -56,6 +61,37 @@ export function SubscriptionsProvider({
     complianceOptions['payment_setting.compliance_confirmed'] &&
     complianceOptions['payment_setting.compliance_terms_version'] ===
       CURRENT_COMPLIANCE_TERMS_VERSION
+  const paymentOptions = getOptionValue(data?.data, {
+    StripeApiSecret: '',
+    StripeWebhookSecret: '',
+    StripePriceId: '',
+    CreemApiKey: '',
+    CreemProducts: '',
+    WaffoPancakeMerchantID: '',
+    WaffoPancakePrivateKey: '',
+  })
+  const subscriptionPaymentAvailability = {
+    stripe:
+      complianceConfirmed &&
+      Boolean(
+        paymentOptions.StripeApiSecret &&
+          paymentOptions.StripeWebhookSecret &&
+          paymentOptions.StripePriceId
+      ),
+    creem:
+      complianceConfirmed &&
+      Boolean(
+        paymentOptions.CreemApiKey &&
+          paymentOptions.CreemProducts &&
+          paymentOptions.CreemProducts !== '[]'
+      ),
+    waffoPancake:
+      complianceConfirmed &&
+      Boolean(
+        paymentOptions.WaffoPancakeMerchantID &&
+          paymentOptions.WaffoPancakePrivateKey
+      ),
+  }
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1)
 
@@ -69,6 +105,7 @@ export function SubscriptionsProvider({
         refreshTrigger,
         triggerRefresh,
         complianceConfirmed,
+        subscriptionPaymentAvailability,
       }}
     >
       {children}

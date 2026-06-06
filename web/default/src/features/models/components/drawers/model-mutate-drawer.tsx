@@ -24,6 +24,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useSystemConfig } from '@/hooks/use-system-config'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -82,6 +84,13 @@ import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
 import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
+import {
+  getCompletionPriceLabelKey,
+  getFixedPriceLabelKey,
+  getPricingCurrencyLabel,
+  getPricingModeLabelKey,
+  getPromptPriceLabelKey,
+} from '../../lib/pricing-currency-label'
 import type { Model } from '../../types'
 
 // Extended schema for ratio configuration (internal form state only)
@@ -122,6 +131,7 @@ export function ModelMutateDrawer({
   currentRow,
 }: ModelMutateDrawerProps) {
   const { t } = useTranslation()
+  const { currency } = useSystemConfig()
   const queryClient = useQueryClient()
   const isEditing = Boolean(currentRow?.id)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -231,6 +241,30 @@ export function ModelMutateDrawer({
     if (value === '') return true
     return !isNaN(parseFloat(value))
   }
+
+  const pricingDisplayType = currency?.quotaDisplayType ?? 'USD'
+  const pricingCurrencyLabel = getPricingCurrencyLabel(
+    pricingDisplayType,
+    currency?.customCurrencySymbol
+  )
+
+  const formatModelPriceRule = (amountUSD: number) =>
+    t('Billing rule: {{price}} / 1M tokens', {
+      price: formatBillingCurrencyFromUSD(amountUSD, {
+        abbreviate: false,
+        digitsLarge: 4,
+        digitsSmall: 4,
+      }),
+    })
+
+  const formatRequestPriceRule = (amountUSD: number) =>
+    t('Billing rule: {{price}} / request', {
+      price: formatBillingCurrencyFromUSD(amountUSD, {
+        abbreviate: false,
+        digitsLarge: 4,
+        digitsSmall: 4,
+      }),
+    })
 
   const handlePromptPriceChange = (value: string) => {
     setPromptPrice(value)
@@ -923,7 +957,11 @@ export function ModelMutateDrawer({
                   name='price'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Fixed price (USD)')}</FormLabel>
+                      <FormLabel>
+                        {t(getFixedPriceLabelKey(pricingDisplayType), {
+                          currency: pricingCurrencyLabel,
+                        })}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type='text'
@@ -938,9 +976,11 @@ export function ModelMutateDrawer({
                         />
                       </FormControl>
                       <FormDescription>
-                        {t(
-                          'Cost in USD per request, regardless of tokens used.'
-                        )}
+                        {field.value && !isNaN(parseFloat(field.value))
+                          ? formatRequestPriceRule(parseFloat(field.value))
+                          : t(
+                              'Stored as base USD per request. The billing rule preview follows the current display currency.'
+                            )}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -965,7 +1005,9 @@ export function ModelMutateDrawer({
                       <div className='flex items-center space-x-2'>
                         <RadioGroupItem value='price' id='price' />
                         <Label htmlFor='price' className='font-normal'>
-                          {t('Price mode (USD per 1M tokens)')}
+                          {t(getPricingModeLabelKey(pricingDisplayType), {
+                            currency: pricingCurrencyLabel,
+                          })}
                         </Label>
                       </div>
                     </RadioGroup>
@@ -1001,7 +1043,7 @@ export function ModelMutateDrawer({
                             </FormControl>
                             <FormDescription>
                               {field.value && !isNaN(parseFloat(field.value))
-                                ? `Calculated price: $${(parseFloat(field.value) * 2).toFixed(4)} per 1M tokens`
+                                ? formatModelPriceRule(parseFloat(field.value) * 2)
                                 : t('Multiplier for prompt tokens.')}
                             </FormDescription>
                             <FormMessage />
@@ -1043,7 +1085,10 @@ export function ModelMutateDrawer({
                               !isNaN(parseFloat(field.value)) &&
                               promptPrice &&
                               !isNaN(parseFloat(promptPrice))
-                                ? `Calculated price: $${(parseFloat(promptPrice) * parseFloat(field.value)).toFixed(4)} per 1M tokens`
+                                ? formatModelPriceRule(
+                                    parseFloat(promptPrice) *
+                                      parseFloat(field.value)
+                                  )
                                 : t('Multiplier for completion tokens.')}
                             </FormDescription>
                             <FormMessage />
@@ -1055,7 +1100,11 @@ export function ModelMutateDrawer({
                     <>
                       <div className='space-y-4'>
                         <div className='space-y-2'>
-                          <Label>{t('Prompt price ($/1M tokens)')}</Label>
+                          <Label>
+                            {t(getPromptPriceLabelKey(pricingDisplayType), {
+                              currency: pricingCurrencyLabel,
+                            })}
+                          </Label>
                           <Input
                             type='text'
                             placeholder='2.0'
@@ -1072,7 +1121,11 @@ export function ModelMutateDrawer({
                         </div>
 
                         <div className='space-y-2'>
-                          <Label>{t('Completion price ($/1M tokens)')}</Label>
+                          <Label>
+                            {t(getCompletionPriceLabelKey(pricingDisplayType), {
+                              currency: pricingCurrencyLabel,
+                            })}
+                          </Label>
                           <Input
                             type='text'
                             placeholder='4.0'

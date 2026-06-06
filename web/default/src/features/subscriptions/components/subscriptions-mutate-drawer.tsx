@@ -22,6 +22,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, CreditCard, RefreshCw, Settings2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { getCurrencyLabel } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -90,7 +91,7 @@ export function SubscriptionsMutateDrawer({
 }: Props) {
   const { t } = useTranslation()
   const isEdit = !!currentRow?.plan?.id
-  const { triggerRefresh } = useSubscriptions()
+  const { triggerRefresh, subscriptionPaymentAvailability } = useSubscriptions()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [groupOptions, setGroupOptions] = useState<string[]>([])
   const [creatingPancakeProduct, setCreatingPancakeProduct] = useState(false)
@@ -145,6 +146,11 @@ export function SubscriptionsMutateDrawer({
     typeof watchedTitle === 'string' &&
     watchedTitle.trim().length > 0 &&
     Number(watchedPrice ?? 0) > 0
+  const currencyLabel = getCurrencyLabel()
+  const hasThirdPartyPaymentConfig =
+    subscriptionPaymentAvailability.stripe ||
+    subscriptionPaymentAvailability.creem ||
+    subscriptionPaymentAvailability.waffoPancake
 
   const onSubmit = async (values: PlanFormValues) => {
     setIsSubmitting(true)
@@ -314,7 +320,11 @@ export function SubscriptionsMutateDrawer({
                   name='price_amount'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Actual Amount')}</FormLabel>
+                      <FormLabel>
+                        {t('Actual Amount ({{currency}})', {
+                          currency: currencyLabel,
+                        })}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -326,6 +336,11 @@ export function SubscriptionsMutateDrawer({
                           }
                         />
                       </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Used as the actual amount charged by Epay, Alipay, WeChat Pay, and Waffo Pancake. Stripe and Creem use their configured product IDs.'
+                        )}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -641,101 +656,124 @@ export function SubscriptionsMutateDrawer({
             </SideDrawerSection>
 
             {/* Payment Config */}
-            <SideDrawerSection>
-              <h3 className='flex items-center gap-2 text-sm font-medium'>
-                <CreditCard className='h-4 w-4' />
-                {t('Third-party Payment Config')}
-              </h3>
+            {hasThirdPartyPaymentConfig && (
+              <SideDrawerSection>
+                <h3 className='flex items-center gap-2 text-sm font-medium'>
+                  <CreditCard className='h-4 w-4' />
+                  {t('Third-party Payment Config')}
+                </h3>
 
-              <FormField
-                control={form.control}
-                name='stripe_price_id'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stripe Price ID</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder='price_...' />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                {subscriptionPaymentAvailability.stripe && (
+                  <FormField
+                    control={form.control}
+                    name='stripe_price_id'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stripe Price ID</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder='price_...' />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Create a Price in the Stripe dashboard for this plan, then paste the Price ID here.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
 
-              <FormField
-                control={form.control}
-                name='creem_product_id'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Creem Product ID</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder='prod_...' />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                {subscriptionPaymentAvailability.creem && (
+                  <FormField
+                    control={form.control}
+                    name='creem_product_id'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Creem Product ID</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder='prod_...' />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Create a Product in the Creem dashboard for this plan, then paste the Product ID here.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
 
-              <FormField
-                control={form.control}
-                name='waffo_pancake_product_id'
-                render={({ field }) => {
-                  // Raw-ID fallback for IDs not yet in the catalog.
-                  const items = pancakeProducts.map((p) => ({
-                    value: p.id,
-                    label: `${p.name} (${p.id})`,
-                  }))
-                  if (
-                    field.value &&
-                    !pancakeProducts.some((p) => p.id === field.value)
-                  ) {
-                    items.push({ value: field.value, label: field.value })
-                  }
-                  return (
-                    <FormItem>
-                      <FormLabel>Waffo Pancake Product ID</FormLabel>
-                      <div className='flex gap-2'>
-                        <Select
-                          items={items}
-                          value={field.value || ''}
-                          onValueChange={(v) => field.onChange(v)}
-                          disabled={items.length === 0}
-                        >
-                          <SelectTrigger className='w-full flex-1'>
-                            <SelectValue placeholder={t('Select a product')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {items.map((item) => (
-                              <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          onClick={handleCreatePancakeProduct}
-                          disabled={
-                            creatingPancakeProduct || !pancakeCreateReady
-                          }
-                          className='shrink-0'
-                        >
-                          {creatingPancakeProduct
-                            ? t('Creating...')
-                            : `+ ${t('Create')}`}
-                        </Button>
-                      </div>
-                      <FormDescription>
-                        {t(
-                          'Creates a Pancake product in the saved store using this plan’s title and price. Requires Waffo Pancake to be fully configured in Payment settings first.'
-                        )}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )
-                }}
-              />
-            </SideDrawerSection>
+                {subscriptionPaymentAvailability.waffoPancake && (
+                  <FormField
+                    control={form.control}
+                    name='waffo_pancake_product_id'
+                    render={({ field }) => {
+                      // Raw-ID fallback for IDs not yet in the catalog.
+                      const items = pancakeProducts.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} (${p.id})`,
+                      }))
+                      if (
+                        field.value &&
+                        !pancakeProducts.some((p) => p.id === field.value)
+                      ) {
+                        items.push({ value: field.value, label: field.value })
+                      }
+                      return (
+                        <FormItem>
+                          <FormLabel>Waffo Pancake Product ID</FormLabel>
+                          <div className='flex gap-2'>
+                            <Select
+                              items={items}
+                              value={field.value || ''}
+                              onValueChange={(v) => field.onChange(v)}
+                              disabled={items.length === 0}
+                            >
+                              <SelectTrigger className='w-full flex-1'>
+                                <SelectValue
+                                  placeholder={t('Select a product')}
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {items.map((item) => (
+                                  <SelectItem
+                                    key={item.value}
+                                    value={item.value}
+                                  >
+                                    {item.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              onClick={handleCreatePancakeProduct}
+                              disabled={
+                                creatingPancakeProduct || !pancakeCreateReady
+                              }
+                              className='shrink-0'
+                            >
+                              {creatingPancakeProduct
+                                ? t('Creating...')
+                                : `+ ${t('Create')}`}
+                            </Button>
+                          </div>
+                          <FormDescription>
+                            {t(
+                              'Creates a Pancake product in the saved store using this plan’s title and price. Requires Waffo Pancake to be fully configured in Payment settings first.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
+                  />
+                )}
+              </SideDrawerSection>
+            )}
           </form>
         </Form>
         <SheetFooter className={sideDrawerFooterClassName()}>

@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useMemo } from 'react'
 import { Plus, X } from 'lucide-react'
+import { formatCurrencyFromUSD } from '@/lib/currency'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -110,7 +111,7 @@ export function AmountOptionsVisualEditor({
                 className='text-base'
                 copyable={false}
               >
-                <span className='font-mono'>${amount}</span>
+                <span className='font-mono'>{formatCurrencyFromUSD(amount)}</span>
                 <Button
                   type='button'
                   variant='ghost'
