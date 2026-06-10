@@ -314,7 +314,7 @@ export function SubscriptionsMutateDrawer({
                 )}
               />
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='price_amount'
@@ -373,7 +373,7 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='upgrade_group'
@@ -438,7 +438,7 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='sort_order'
@@ -458,7 +458,9 @@ export function SubscriptionsMutateDrawer({
                     </FormItem>
                   )}
                 />
+              </div>
 
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='enabled'
@@ -504,7 +506,7 @@ export function SubscriptionsMutateDrawer({
                 {t('Duration Settings')}
               </h3>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='duration_unit'
@@ -594,7 +596,7 @@ export function SubscriptionsMutateDrawer({
                 {t('Quota Reset')}
               </h3>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
                 <FormField
                   control={form.control}
                   name='quota_reset_period'

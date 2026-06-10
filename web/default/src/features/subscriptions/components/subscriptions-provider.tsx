@@ -18,10 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import React, { useState } from 'react'
 import useDialogState from '@/hooks/use-dialog'
+import { useQuery } from '@tanstack/react-query'
 import {
   getOptionValue,
   useSystemOptions,
 } from '@/features/system-settings/hooks/use-system-options'
+import { getPaymentConfigs } from '@/features/system-settings/api'
+import type { PaymentConfig } from '@/features/system-settings/types'
 import { type PlanRecord, type SubscriptionsDialogType } from '../types'
 
 const CURRENT_COMPLIANCE_TERMS_VERSION = 'v1'
@@ -38,7 +41,11 @@ type SubscriptionsContextType = {
     stripe: boolean
     creem: boolean
     waffoPancake: boolean
+    alipay: boolean
+    wechat: boolean
+    epay: boolean
   }
+  paymentConfigs: PaymentConfig[]
 }
 
 const SubscriptionsContext =
@@ -53,6 +60,13 @@ export function SubscriptionsProvider({
   const [currentRow, setCurrentRow] = useState<PlanRecord | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { data } = useSystemOptions()
+  const { data: paymentConfigsData } = useQuery({
+    queryKey: ['payment-configs'],
+    queryFn: getPaymentConfigs,
+  })
+  const paymentConfigs = paymentConfigsData?.success
+    ? (paymentConfigsData.data ?? [])
+    : []
   const complianceOptions = getOptionValue(data?.data, {
     'payment_setting.compliance_confirmed': false,
     'payment_setting.compliance_terms_version': '',
@@ -69,6 +83,9 @@ export function SubscriptionsProvider({
     CreemProducts: '',
     WaffoPancakeMerchantID: '',
     WaffoPancakePrivateKey: '',
+    PayAddress: '',
+    EpayId: '',
+    EpayKey: '',
   })
   const subscriptionPaymentAvailability = {
     stripe:
@@ -91,6 +108,19 @@ export function SubscriptionsProvider({
         paymentOptions.WaffoPancakeMerchantID &&
           paymentOptions.WaffoPancakePrivateKey
       ),
+    alipay:
+      complianceConfirmed &&
+      Boolean(paymentConfigs.find((c) => c.provider === 'alipay' && c.enabled)),
+    wechat:
+      complianceConfirmed &&
+      Boolean(paymentConfigs.find((c) => c.provider === 'wxpay' && c.enabled)),
+    epay:
+      complianceConfirmed &&
+      Boolean(
+        paymentOptions.PayAddress ||
+          paymentOptions.EpayId ||
+          paymentOptions.EpayKey
+      ),
   }
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1)
@@ -106,6 +136,7 @@ export function SubscriptionsProvider({
         triggerRefresh,
         complianceConfirmed,
         subscriptionPaymentAvailability,
+        paymentConfigs,
       }}
     >
       {children}

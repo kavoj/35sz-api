@@ -25,11 +25,14 @@ import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
 import { formatDuration, formatResetPeriod } from '../lib'
+import { formatSubscriptionPlanPrice } from '../lib/subscription-price-format'
+import { useSubscriptions } from './subscriptions-provider'
 import type { PlanRecord } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 
 export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
   const { t } = useTranslation()
+  const { subscriptionPaymentAvailability } = useSubscriptions()
 
   return useMemo(
     (): ColumnDef<PlanRecord>[] => [
@@ -74,7 +77,7 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
         ),
         cell: ({ row }) => (
           <span className='font-semibold text-emerald-600'>
-            ${Number(row.original.plan.price_amount || 0).toFixed(2)}
+            {formatSubscriptionPlanPrice(row.original.plan.price_amount)}
           </span>
         ),
         size: 100,
@@ -150,24 +153,34 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
         ),
         cell: ({ row }) => {
           const plan = row.original.plan
+          const showNative = plan.price_amount > 0
           return (
             <div className='flex gap-1'>
-              {plan.stripe_price_id && (
+              {plan.stripe_price_id && subscriptionPaymentAvailability.stripe && (
                 <StatusBadge
                   label='Stripe'
                   variant='neutral'
                   copyable={false}
                 />
               )}
-              {plan.creem_product_id && (
+              {plan.creem_product_id && subscriptionPaymentAvailability.creem && (
                 <StatusBadge label='Creem' variant='neutral' copyable={false} />
               )}
-              {plan.waffo_pancake_product_id && (
+              {plan.waffo_pancake_product_id && subscriptionPaymentAvailability.waffoPancake && (
                 <StatusBadge
                   label='Waffo Pancake'
                   variant='neutral'
                   copyable={false}
                 />
+              )}
+              {showNative && subscriptionPaymentAvailability.alipay && (
+                <StatusBadge label='Alipay' variant='neutral' copyable={false} />
+              )}
+              {showNative && subscriptionPaymentAvailability.wechat && (
+                <StatusBadge label='WeChat Pay' variant='neutral' copyable={false} />
+              )}
+              {showNative && subscriptionPaymentAvailability.epay && (
+                <StatusBadge label='Epay' variant='neutral' copyable={false} />
               )}
             </div>
           )
@@ -213,6 +226,6 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
         size: 80,
       },
     ],
-    [t]
+    [t, subscriptionPaymentAvailability]
   )
 }

@@ -207,6 +207,91 @@ function GatewaySwitchRow(props: {
   )
 }
 
+type NativePaymentProvider = 'alipay' | 'wxpay'
+
+function getNativePaymentDisplayName(provider: NativePaymentProvider) {
+  return provider === 'alipay' ? 'Alipay' : 'Wechat Pay'
+}
+
+function PaymentIconUploadField(props: {
+  label: string
+  value?: string
+  onChange: (value: string) => void
+}) {
+  const { t } = useTranslation()
+  const iconFileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  const handleIconFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    const maxIconSize = 100 * 1024
+
+    if (file.size > maxIconSize) {
+      toast.error(t('Icon file must be 100 KB or smaller'))
+      event.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (loadEvent) => {
+      props.onChange(
+        typeof loadEvent.target?.result === 'string'
+          ? loadEvent.target.result
+          : ''
+      )
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  return (
+    <div className='space-y-2'>
+      <Label>{props.label}</Label>
+      <div className='flex flex-wrap items-center gap-3'>
+        {props.value ? (
+          <img
+            src={props.value}
+            alt={props.label}
+            className='h-10 w-10 rounded border object-contain p-1'
+          />
+        ) : (
+          <div className='bg-muted text-muted-foreground flex h-10 w-10 items-center justify-center rounded border text-xs'>
+            {t('Icon')}
+          </div>
+        )}
+        <input
+          ref={iconFileInputRef}
+          type='file'
+          accept='image/png,image/jpeg,image/svg+xml,image/webp'
+          className='hidden'
+          onChange={handleIconFileChange}
+        />
+        <Button
+          type='button'
+          variant='outline'
+          onClick={() => iconFileInputRef.current?.click()}
+        >
+          {t('Upload icon')}
+        </Button>
+        {props.value ? (
+          <Button type='button' variant='outline' onClick={() => props.onChange('')}>
+            {t('Clear icon')}
+          </Button>
+        ) : null}
+      </div>
+      <p className='text-muted-foreground text-xs'>
+        {t(
+          'Supports PNG, JPG, SVG, or WebP. Recommended size: 128×128 or smaller.'
+        )}
+      </p>
+    </div>
+  )
+}
+
 type PaymentSettingsSectionProps = {
   defaultValues: PaymentBaseFormValues
   waffoDefaultValues: WaffoSettingsValues
@@ -322,14 +407,14 @@ export function PaymentSettingsSection({
   const [alipayForm, setAlipayForm] = React.useState<Partial<PaymentConfig>>({
     provider: 'alipay',
     name: 'Alipay',
-    display_name: '支付宝',
+    display_name: getNativePaymentDisplayName('alipay'),
     enabled: false,
     sort_order: 10,
   })
   const [wechatForm, setWechatForm] = React.useState<Partial<PaymentConfig>>({
     provider: 'wxpay',
     name: 'WeChat Pay',
-    display_name: '微信支付',
+    display_name: getNativePaymentDisplayName('wxpay'),
     enabled: false,
     sort_order: 20,
   })
@@ -383,11 +468,17 @@ export function PaymentSettingsSection({
     const wechat = paymentConfigs.find(c => c.provider === 'wxpay')
     if (alipay) {
       setAlipayConfig(alipay)
-      setAlipayForm(alipay)
+      setAlipayForm({
+        ...alipay,
+        display_name: getNativePaymentDisplayName('alipay'),
+      })
     }
     if (wechat) {
       setWechatConfig(wechat)
-      setWechatForm(wechat)
+      setWechatForm({
+        ...wechat,
+        display_name: getNativePaymentDisplayName('wxpay'),
+      })
     }
   }, [paymentConfigs])
 
@@ -542,14 +633,18 @@ export function PaymentSettingsSection({
 
   const saveAlipayConfig = async () => {
     if (!alipayForm.provider) return
+    const data = {
+      ...alipayForm,
+      display_name: getNativePaymentDisplayName('alipay'),
+    } as PaymentConfig
     try {
       if (alipayConfig?.id) {
         await updatePaymentConfigMutation.mutateAsync({
           id: alipayConfig.id,
-          data: alipayForm as PaymentConfig,
+          data,
         })
       } else {
-        await createPaymentConfigMutation.mutateAsync(alipayForm as PaymentConfig)
+        await createPaymentConfigMutation.mutateAsync(data)
       }
       toast.success(t('Alipay configuration saved successfully'))
       await refetchPaymentConfigs()
@@ -560,14 +655,18 @@ export function PaymentSettingsSection({
 
   const saveWechatConfig = async () => {
     if (!wechatForm.provider) return
+    const data = {
+      ...wechatForm,
+      display_name: getNativePaymentDisplayName('wxpay'),
+    } as PaymentConfig
     try {
       if (wechatConfig?.id) {
         await updatePaymentConfigMutation.mutateAsync({
           id: wechatConfig.id,
-          data: wechatForm as PaymentConfig,
+          data,
         })
       } else {
-        await createPaymentConfigMutation.mutateAsync(wechatForm as PaymentConfig)
+        await createPaymentConfigMutation.mutateAsync(data)
       }
       toast.success(t('WeChat Pay configuration saved successfully'))
       await refetchPaymentConfigs()
@@ -1455,10 +1554,10 @@ export function PaymentSettingsSection({
                 <div className='grid gap-4 sm:grid-cols-2'>
                   <div className='space-y-2'>
                     <Label>{t('Display name')}</Label>
-                    <Input
-                      value={alipayForm.display_name || ''}
-                      onChange={(event) => setAlipayForm(prev => ({ ...prev, display_name: event.target.value }))}
-                    />
+                    <Input value={getNativePaymentDisplayName('alipay')} disabled />
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Display name is fixed by the selected payment channel.')}
+                    </p>
                   </div>
                   <div className='space-y-2'>
                     <Label>{t('Sort order')}</Label>
@@ -1470,14 +1569,13 @@ export function PaymentSettingsSection({
                   </div>
                 </div>
 
-                <div className='space-y-2'>
-                  <Label>{t('Icon URL')}</Label>
-                  <Input
-                    value={alipayForm.icon_url || ''}
-                    onChange={(event) => setAlipayForm(prev => ({ ...prev, icon_url: event.target.value }))}
-                    placeholder='https://example.com/payment-icon.png'
-                  />
-                </div>
+                <PaymentIconUploadField
+                  label={t('Icon')}
+                  value={alipayForm.icon_url || ''}
+                  onChange={(value) =>
+                    setAlipayForm((prev) => ({ ...prev, icon_url: value }))
+                  }
+                />
 
                 <div className='space-y-2'>
                   <Label>{t('App ID')}</Label>
@@ -1583,10 +1681,10 @@ export function PaymentSettingsSection({
                 <div className='grid gap-4 sm:grid-cols-2'>
                   <div className='space-y-2'>
                     <Label>{t('Display name')}</Label>
-                    <Input
-                      value={wechatForm.display_name || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, display_name: event.target.value }))}
-                    />
+                    <Input value={getNativePaymentDisplayName('wxpay')} disabled />
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Display name is fixed by the selected payment channel.')}
+                    </p>
                   </div>
                   <div className='space-y-2'>
                     <Label>{t('Sort order')}</Label>
@@ -1598,14 +1696,13 @@ export function PaymentSettingsSection({
                   </div>
                 </div>
 
-                <div className='space-y-2'>
-                  <Label>{t('Icon URL')}</Label>
-                  <Input
-                    value={wechatForm.icon_url || ''}
-                    onChange={(event) => setWechatForm(prev => ({ ...prev, icon_url: event.target.value }))}
-                    placeholder='https://example.com/payment-icon.png'
-                  />
-                </div>
+                <PaymentIconUploadField
+                  label={t('Icon')}
+                  value={wechatForm.icon_url || ''}
+                  onChange={(value) =>
+                    setWechatForm((prev) => ({ ...prev, icon_url: value }))
+                  }
+                />
 
                 <div className='grid gap-4 sm:grid-cols-2'>
                   <div className='space-y-2'>

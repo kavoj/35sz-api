@@ -106,7 +106,8 @@ export function quotaUnitsToDollars(units: number): number {
   const exchangeRate =
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
 
-  return usdAmount * exchangeRate
+  // Round to 4 decimal places to avoid floating point precision issues
+  return Math.round((usdAmount * exchangeRate) * 10000) / 10000
 }
 
 // ============================================================================
