@@ -70,7 +70,14 @@ import {
   SettingsControlGroup,
   SettingsSwitchField,
 } from '../components/settings-form-layout'
-import { formatPricingNumber } from './pricing-format'
+import {
+  displayPricingValueToUsd,
+  formatModelPricingAmountFromUSD,
+  formatPricingNumber,
+  getModelPricingCurrencyPrefix,
+  getModelPricingUnitLabel,
+  usdToDisplayPricingValue,
+} from './pricing-format'
 import { TieredPricingEditor } from './tiered-pricing-editor'
 
 const createModelPricingSchema = (t: (key: string) => string) =>
@@ -225,7 +232,7 @@ function toNumberOrNull(value: unknown): number | null {
 function ratioToBasePrice(ratio: unknown): string {
   const num = toNumberOrNull(ratio)
   if (num === null) return ''
-  return formatPricingNumber(num * 2)
+  return usdToDisplayPricingValue(num * 2)
 }
 
 function deriveLanePrice(
@@ -234,9 +241,9 @@ function deriveLanePrice(
   fallback = ''
 ): string {
   const ratioNumber = toNumberOrNull(ratio)
-  const denominatorNumber = toNumberOrNull(denominator)
+  const denominatorNumber = displayPricingValueToUsd(denominator)
   if (ratioNumber === null || denominatorNumber === null) return fallback
-  return formatPricingNumber(ratioNumber * denominatorNumber)
+  return usdToDisplayPricingValue(ratioNumber * denominatorNumber)
 }
 
 function createInitialLaneState(data?: ModelRatioData | null) {
@@ -287,6 +294,11 @@ function getModeBadgeVariant(
   return 'outline'
 }
 
+function formatDisplayPricingValue(value: unknown): string {
+  const valueUsd = displayPricingValueToUsd(value)
+  return valueUsd === null ? '' : formatModelPricingAmountFromUSD(valueUsd)
+}
+
 function buildPreviewRows(
   values: ModelPricingFormValues,
   mode: PricingMode,
@@ -315,7 +327,7 @@ function buildPreviewRows(
       {
         key: 'price',
         label: 'ModelPrice',
-        value: values.price || t('Empty'),
+        value: values.price ? formatDisplayPricingValue(values.price) : t('Empty'),
       },
     ]
   }
@@ -324,14 +336,14 @@ function buildPreviewRows(
     {
       key: 'inputPrice',
       label: t('Input price'),
-      value: promptPrice ? `$${promptPrice}` : t('Empty'),
+      value: promptPrice ? formatDisplayPricingValue(promptPrice) : t('Empty'),
     },
     {
       key: 'completion',
       label: t('Completion price'),
       value:
         laneEnabled.completion && lanePrices.completion
-          ? `$${lanePrices.completion}`
+          ? formatDisplayPricingValue(lanePrices.completion)
           : t('Empty'),
     },
     {
@@ -339,7 +351,7 @@ function buildPreviewRows(
       label: t('Cache read price'),
       value:
         laneEnabled.cache && lanePrices.cache
-          ? `$${lanePrices.cache}`
+          ? formatDisplayPricingValue(lanePrices.cache)
           : t('Empty'),
     },
     {
@@ -347,7 +359,7 @@ function buildPreviewRows(
       label: t('Cache write price'),
       value:
         laneEnabled.createCache && lanePrices.createCache
-          ? `$${lanePrices.createCache}`
+          ? formatDisplayPricingValue(lanePrices.createCache)
           : t('Empty'),
     },
     {
@@ -355,7 +367,7 @@ function buildPreviewRows(
       label: t('Image input price'),
       value:
         laneEnabled.image && lanePrices.image
-          ? `$${lanePrices.image}`
+          ? formatDisplayPricingValue(lanePrices.image)
           : t('Empty'),
     },
     {
@@ -363,7 +375,7 @@ function buildPreviewRows(
       label: t('Audio input price'),
       value:
         laneEnabled.audioInput && lanePrices.audioInput
-          ? `$${lanePrices.audioInput}`
+          ? formatDisplayPricingValue(lanePrices.audioInput)
           : t('Empty'),
     },
     {
@@ -371,7 +383,7 @@ function buildPreviewRows(
       label: t('Audio output price'),
       value:
         laneEnabled.audioOutput && lanePrices.audioOutput
-          ? `$${lanePrices.audioOutput}`
+          ? formatDisplayPricingValue(lanePrices.audioOutput)
           : t('Empty'),
     },
   ]
@@ -456,7 +468,7 @@ export function ModelPricingEditorPanel({
     if (editData) {
       form.reset({
         name: editData.name,
-        price: editData.price || '',
+        price: usdToDisplayPricingValue(editData.price),
         ratio: editData.ratio || '',
         cacheRatio: editData.cacheRatio || '',
         createCacheRatio: editData.createCacheRatio || '',
@@ -510,16 +522,16 @@ export function ModelPricingEditorPanel({
     nextPromptPrice = promptPrice,
     nextLanePrices = lanePrices
   ) => {
-    const priceNumber = toNumberOrNull(price)
+    const priceNumber = displayPricingValueToUsd(price)
     if (priceNumber === null) return ''
 
     if (lane === 'audioOutput') {
-      const audioInputPrice = toNumberOrNull(nextLanePrices.audioInput)
+      const audioInputPrice = displayPricingValueToUsd(nextLanePrices.audioInput)
       if (audioInputPrice === null || audioInputPrice === 0) return ''
       return formatPricingNumber(priceNumber / audioInputPrice)
     }
 
-    const inputPrice = toNumberOrNull(nextPromptPrice)
+    const inputPrice = displayPricingValueToUsd(nextPromptPrice)
     if (inputPrice === null || inputPrice === 0) return ''
     return formatPricingNumber(priceNumber / inputPrice)
   }
@@ -529,7 +541,7 @@ export function ModelPricingEditorPanel({
     nextLanePrices = lanePrices,
     nextLaneEnabled = laneEnabled
   ) => {
-    const inputPrice = toNumberOrNull(nextPromptPrice)
+    const inputPrice = displayPricingValueToUsd(nextPromptPrice)
     setFormValue(
       'ratio',
       inputPrice !== null ? formatPricingNumber(inputPrice / 2) : ''
@@ -712,10 +724,14 @@ export function ModelPricingEditorPanel({
       return
     }
 
+    const fixedPriceUsd = displayPricingValueToUsd(values.price)
     const data: ModelRatioData = {
       name: values.name.trim(),
       billingMode: pricingMode,
-      price: values.price || '',
+      price:
+        pricingMode === 'per-request' && fixedPriceUsd !== null
+          ? formatPricingNumber(fixedPriceUsd)
+          : '',
       ratio: values.ratio || '',
       cacheRatio: values.cacheRatio || '',
       createCacheRatio: values.createCacheRatio || '',
@@ -823,7 +839,7 @@ export function ModelPricingEditorPanel({
                         onChange={handlePromptPriceChange}
                       />
                       <FieldDescription>
-                        {t('USD price per 1M input tokens.')}
+                        {t('Price per 1M input tokens in the selected display currency.')}
                       </FieldDescription>
                     </Field>
 
@@ -867,7 +883,7 @@ export function ModelPricingEditorPanel({
                         <FormLabel>{t('Fixed price')}</FormLabel>
                         <FormControl>
                           <InputGroup>
-                            <InputGroupAddon>$</InputGroupAddon>
+                            <InputGroupAddon>{getModelPricingCurrencyPrefix()}</InputGroupAddon>
                             <InputGroupInput
                               inputMode='decimal'
                               placeholder='0.01'
@@ -886,7 +902,7 @@ export function ModelPricingEditorPanel({
                         </FormControl>
                         <FormDescription>
                           {t(
-                            'Cost in USD per request, regardless of tokens used.'
+                            'Cost per request in the selected display currency. It is saved internally as USD.'
                           )}
                         </FormDescription>
                         <FormMessage />
@@ -988,9 +1004,11 @@ function PriceInput(props: {
   disabled?: boolean
   onChange: (value: string) => void
 }) {
+  const prefix = getModelPricingCurrencyPrefix()
+  const unitLabel = getModelPricingUnitLabel()
   return (
     <InputGroup>
-      <InputGroupAddon>$</InputGroupAddon>
+      <InputGroupAddon>{prefix}</InputGroupAddon>
       <InputGroupInput
         inputMode='decimal'
         value={props.value}
@@ -998,7 +1016,7 @@ function PriceInput(props: {
         disabled={props.disabled}
         onChange={(event) => props.onChange(event.target.value)}
       />
-      <InputGroupAddon align='inline-end'>$/1M</InputGroupAddon>
+      <InputGroupAddon align='inline-end'>{unitLabel}</InputGroupAddon>
     </InputGroup>
   )
 }
@@ -1037,7 +1055,7 @@ function PriceLane(props: {
       />
       <p className='text-muted-foreground text-xs'>
         {props.enabled
-          ? t('USD price per 1M tokens.')
+          ? t('Price per 1M tokens in the selected display currency.')
           : t('Disabled lanes are omitted on save.')}
       </p>
     </SettingsControlGroup>

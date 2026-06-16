@@ -16,11 +16,17 @@ func maskPaymentConfig(config *model.PaymentConfig) {
 	if config.AlipayPublicKey != "" {
 		config.AlipayPublicKey = common.MaskSecret(config.AlipayPublicKey)
 	}
+	if config.WechatAppSecret != "" {
+		config.WechatAppSecret = common.MaskSecret(config.WechatAppSecret)
+	}
 	if config.WechatAPIKey != "" {
 		config.WechatAPIKey = common.MaskSecret(config.WechatAPIKey)
 	}
 	if config.WechatPrivateKey != "" {
 		config.WechatPrivateKey = common.MaskSecret(config.WechatPrivateKey)
+	}
+	if config.WechatCert != "" {
+		config.WechatCert = common.MaskSecret(config.WechatCert)
 	}
 }
 
@@ -47,6 +53,13 @@ func encryptPaymentConfigSensitiveFields(config *model.PaymentConfig) error {
 		}
 		config.AlipayPublicKey = encrypted
 	}
+	if shouldEncryptPaymentSecret(config.WechatAppSecret) {
+		encrypted, err := common.EncryptPaymentSecret(config.WechatAppSecret)
+		if err != nil {
+			return err
+		}
+		config.WechatAppSecret = encrypted
+	}
 	if shouldEncryptPaymentSecret(config.WechatAPIKey) {
 		encrypted, err := common.EncryptPaymentSecret(config.WechatAPIKey)
 		if err != nil {
@@ -61,6 +74,13 @@ func encryptPaymentConfigSensitiveFields(config *model.PaymentConfig) error {
 		}
 		config.WechatPrivateKey = encrypted
 	}
+	if shouldEncryptPaymentSecret(config.WechatCert) {
+		encrypted, err := common.EncryptPaymentSecret(config.WechatCert)
+		if err != nil {
+			return err
+		}
+		config.WechatCert = encrypted
+	}
 	return nil
 }
 
@@ -71,12 +91,25 @@ func handleMaskedFieldsOnUpdate(config *model.PaymentConfig, existing *model.Pay
 	if common.IsMaskedSecret(config.AlipayPublicKey) {
 		config.AlipayPublicKey = existing.AlipayPublicKey
 	}
+	if common.IsMaskedSecret(config.WechatAppSecret) {
+		config.WechatAppSecret = existing.WechatAppSecret
+	}
 	if common.IsMaskedSecret(config.WechatAPIKey) {
 		config.WechatAPIKey = existing.WechatAPIKey
 	}
 	if common.IsMaskedSecret(config.WechatPrivateKey) {
 		config.WechatPrivateKey = existing.WechatPrivateKey
 	}
+	if common.IsMaskedSecret(config.WechatCert) {
+		config.WechatCert = existing.WechatCert
+	}
+}
+
+func paymentConfigCreateErrorMessage(err error) string {
+	if err == nil {
+		return "Failed to create payment config"
+	}
+	return "Failed to create payment config: " + err.Error()
 }
 
 func GetPaymentConfigs(c *gin.Context) {
@@ -137,7 +170,7 @@ func CreatePaymentConfig(c *gin.Context) {
 		return
 	}
 	if err := model.CreatePaymentConfig(&config); err != nil {
-		common.ApiErrorMsg(c, "Failed to create payment config")
+		common.ApiErrorMsg(c, paymentConfigCreateErrorMessage(err))
 		return
 	}
 	maskPaymentConfig(&config)

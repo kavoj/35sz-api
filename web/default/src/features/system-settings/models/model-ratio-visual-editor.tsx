@@ -65,7 +65,10 @@ import {
   ModelPricingSheet,
   type ModelRatioData,
 } from './model-pricing-sheet'
-import { formatPricingNumber } from './pricing-format'
+import {
+  formatModelPricingAmountFromUSD,
+  formatPricingNumber,
+} from './pricing-format'
 
 type ModelRatioVisualEditorProps = {
   modelPrice: string
@@ -147,7 +150,9 @@ const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
     return getExpressionSummary(row, t)
   }
   if (row.billingMode === 'per-request') {
-    return row.price ? `$${row.price} / ${t('request')}` : t('Unset price')
+    return row.price
+      ? `${formatModelPricingAmountFromUSD(row.price)} / ${t('request')}`
+      : t('Unset price')
   }
 
   const inputPrice = ratioToPrice(row.ratio)
@@ -163,8 +168,8 @@ const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
   ].filter(hasValue).length
 
   return extraCount > 0
-    ? `${t('Input')} $${inputPrice} · ${extraCount} ${t('extras')}`
-    : `${t('Input')} $${inputPrice}`
+    ? `${t('Input')} ${formatModelPricingAmountFromUSD(inputPrice)} · ${extraCount} ${t('extras')}`
+    : `${t('Input')} ${formatModelPricingAmountFromUSD(inputPrice)}`
 }
 
 const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
@@ -182,11 +187,11 @@ const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
 
   const details = [
     row.completionRatio &&
-      `${t('Output')} $${ratioToPrice(row.completionRatio, inputPrice)}`,
+      `${t('Output')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.completionRatio, inputPrice))}`,
     row.cacheRatio &&
-      `${t('Cache')} $${ratioToPrice(row.cacheRatio, inputPrice)}`,
+      `${t('Cache')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.cacheRatio, inputPrice))}`,
     row.createCacheRatio &&
-      `${t('Cache write')} $${ratioToPrice(row.createCacheRatio, inputPrice)}`,
+      `${t('Cache write')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.createCacheRatio, inputPrice))}`,
   ].filter(Boolean)
 
   return details.length > 0 ? details.join(' · ') : t('Base input price only')

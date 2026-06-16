@@ -35,6 +35,12 @@ func decryptPaymentConfigSensitiveFields(config *model.PaymentConfig) error {
 			return err
 		}
 	}
+	if config.WechatAppSecret != "" && !common.IsMaskedSecret(config.WechatAppSecret) {
+		config.WechatAppSecret, err = common.DecryptPaymentSecret(config.WechatAppSecret)
+		if err != nil {
+			return err
+		}
+	}
 	if config.WechatAPIKey != "" && !common.IsMaskedSecret(config.WechatAPIKey) {
 		config.WechatAPIKey, err = common.DecryptPaymentSecret(config.WechatAPIKey)
 		if err != nil {
@@ -43,6 +49,12 @@ func decryptPaymentConfigSensitiveFields(config *model.PaymentConfig) error {
 	}
 	if config.WechatPrivateKey != "" && !common.IsMaskedSecret(config.WechatPrivateKey) {
 		config.WechatPrivateKey, err = common.DecryptPaymentSecret(config.WechatPrivateKey)
+		if err != nil {
+			return err
+		}
+	}
+	if config.WechatCert != "" && !common.IsMaskedSecret(config.WechatCert) {
+		config.WechatCert, err = common.DecryptPaymentSecret(config.WechatCert)
 		if err != nil {
 			return err
 		}

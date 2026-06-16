@@ -291,11 +291,15 @@ export interface PaymentConfig {
   alipay_public_cert?: string
   alipay_root_cert?: string
   wechat_app_id?: string
+  wechat_app_secret?: string
   wechat_mch_id?: string
   wechat_api_key?: string
   wechat_serial_no?: string
   wechat_private_key?: string
   wechat_cert?: string
+  wechat_auth_mode?: 'certificate' | 'public_key'
+  wechat_public_key_id?: string
+  wechat_public_key?: string
   gateway_url?: string
   notify_url?: string
   return_url?: string

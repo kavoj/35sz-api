@@ -47,6 +47,7 @@ export function usePayment() {
   const [amount, setAmount] = useState<number>(0)
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [wechatCodeUrl, setWechatCodeUrl] = useState('')
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
@@ -145,8 +146,7 @@ export function usePayment() {
             return true
           }
           if (codeUrl) {
-            window.open(codeUrl, '_blank')
-            toast.success(i18next.t('WeChat payment QR code opened'))
+            setWechatCodeUrl(codeUrl)
             return true
           }
         }
@@ -179,5 +179,7 @@ export function usePayment() {
     calculatePaymentAmount,
     processPayment,
     setAmount,
+    wechatCodeUrl,
+    setWechatCodeUrl,
   }
 }

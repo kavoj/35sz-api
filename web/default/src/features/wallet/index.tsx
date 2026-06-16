@@ -27,6 +27,7 @@ import { BillingHistoryDialog } from './components/dialogs/billing-history-dialo
 import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
+import { WechatQrPayDialog } from './components/dialogs/wechat-qr-pay-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
 import { SubscriptionPlansCard } from './components/subscription-plans-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
@@ -41,8 +42,10 @@ import {
   useWaffoPancakePayment,
 } from './hooks'
 import {
+  calculatePresetPricing,
   getDefaultPaymentType,
   getMinTopupAmount,
+  getPresetTopupAmount,
   isWaffoPancakePayment,
 } from './lib'
 import type {
@@ -90,6 +93,8 @@ export function Wallet(props: WalletProps) {
     processing,
     calculatePaymentAmount,
     processPayment,
+    wechatCodeUrl,
+    setWechatCodeUrl,
   } = usePayment()
   const {
     affiliateLink,
@@ -149,9 +154,18 @@ export function Wallet(props: WalletProps) {
 
   // Handle preset selection
   const handleSelectPreset = (preset: PresetAmount) => {
-    setTopupAmount(preset.value)
+    const discount =
+      preset.discount || topupInfo?.discount?.[preset.value] || DEFAULT_DISCOUNT_RATE
+    const { actualPrice } = calculatePresetPricing(
+      preset.value,
+      (status?.price as number) || 1,
+      discount,
+      effectiveUsdExchangeRate
+    )
+    const nextAmount = getPresetTopupAmount(preset.value, actualPrice)
+    setTopupAmount(nextAmount)
     setSelectedPreset(preset.value)
-    calculatePaymentAmount(preset.value, getCurrentPaymentType())
+    calculatePaymentAmount(nextAmount, getCurrentPaymentType())
   }
 
   // Handle topup amount change
@@ -337,7 +351,16 @@ export function Wallet(props: WalletProps) {
         calculating={calculating}
         processing={processing || pancakeProcessing}
         discountRate={getDiscountRate()}
-        usdExchangeRate={effectiveUsdExchangeRate}
+      />
+
+      <WechatQrPayDialog
+        open={Boolean(wechatCodeUrl)}
+        codeUrl={wechatCodeUrl}
+        onOpenChange={(open) => !open && setWechatCodeUrl('')}
+        onRefresh={async () => {
+          setWechatCodeUrl('')
+          await fetchUser()
+        }}
       />
 
       <TransferDialog

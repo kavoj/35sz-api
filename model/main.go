@@ -254,6 +254,10 @@ func migrateDB() error {
 	if err := migrateTokenModelLimitsToText(); err != nil {
 		return err
 	}
+	// Migrate wechat_api_key column from varchar to text for public-key PEM compatibility
+	if err := migratePaymentConfigWechatAPIKeyToText(); err != nil {
+		return err
+	}
 
 	err := DB.AutoMigrate(
 		&Channel{},
@@ -523,6 +527,54 @@ func migrateTokenModelLimitsToText() error {
 		}
 		common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to text", tableName, columnName))
 	}
+	return nil
+}
+
+func migratePaymentConfigWechatAPIKeyToText() error {
+	if common.UsingSQLite {
+		return nil
+	}
+
+	tableName := "payment_configs"
+	columnName := "wechat_api_key"
+
+	if !DB.Migrator().HasTable(tableName) {
+		return nil
+	}
+	if !DB.Migrator().HasColumn(&PaymentConfig{}, columnName) {
+		return nil
+	}
+
+	var alterSQL string
+	if common.UsingPostgreSQL {
+		var dataType string
+		if err := DB.Raw(`SELECT data_type FROM information_schema.columns
+			WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+			tableName, columnName).Scan(&dataType).Error; err != nil {
+			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
+		} else if dataType == "text" {
+			return nil
+		}
+		alterSQL = fmt.Sprintf(`ALTER TABLE %s ALTER COLUMN %s TYPE text`, tableName, columnName)
+	} else if common.UsingMySQL {
+		var columnType string
+		if err := DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+			tableName, columnName).Scan(&columnType).Error; err != nil {
+			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
+		} else if strings.ToLower(columnType) == "text" {
+			return nil
+		}
+		alterSQL = fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s text", tableName, columnName)
+	}
+
+	if alterSQL == "" {
+		return nil
+	}
+	if err := DB.Exec(alterSQL).Error; err != nil {
+		return fmt.Errorf("failed to migrate %s.%s to text: %w", tableName, columnName, err)
+	}
+	common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to text", tableName, columnName))
 	return nil
 }
 

@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
@@ -25,12 +29,69 @@ type WechatPayClient struct {
 	handler   *notify.Handler
 }
 
-func NewWechatPayClient(config *model.PaymentConfig, notifyPath string) (*WechatPayClient, error) {
+func validateWechatPayConfig(config *model.PaymentConfig) error {
 	if config == nil {
-		return nil, fmt.Errorf("wechat config is nil")
+		return fmt.Errorf("wechat config is nil")
 	}
-	if config.WechatAppID == "" || config.WechatMchID == "" || config.WechatAPIKey == "" || config.WechatSerialNo == "" || config.WechatPrivateKey == "" {
-		return nil, fmt.Errorf("wechat pay config is incomplete")
+	if config.WechatAppID == "" || config.WechatMchID == "" || config.WechatPrivateKey == "" {
+		return fmt.Errorf("wechat pay config is incomplete")
+	}
+	if config.WechatSerialNo == "" && config.WechatCert == "" {
+		return fmt.Errorf("wechat merchant certificate or serial number is required")
+	}
+	if config.WechatAuthMode == "public_key" {
+		if config.WechatPublicKeyID == "" || config.WechatPublicKey == "" {
+			return fmt.Errorf("wechat pay public key config is incomplete")
+		}
+		return nil
+	}
+	if config.WechatAPIKey == "" {
+		return fmt.Errorf("wechat pay api v3 key is required")
+	}
+	return nil
+}
+
+func parseWechatMerchantCertSerial(certPEM string) (string, error) {
+	block, _ := pem.Decode([]byte(strings.TrimSpace(certPEM)))
+	if block == nil {
+		return "", fmt.Errorf("decode wechat merchant certificate failed")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("parse wechat merchant certificate failed: %w", err)
+	}
+	return strings.ToUpper(cert.SerialNumber.Text(16)), nil
+}
+
+func getWechatMerchantSerialNo(config *model.PaymentConfig) (string, error) {
+	if strings.TrimSpace(config.WechatSerialNo) != "" {
+		return strings.TrimSpace(config.WechatSerialNo), nil
+	}
+	if strings.TrimSpace(config.WechatCert) == "" {
+		return "", fmt.Errorf("wechat merchant certificate serial number is required")
+	}
+	return parseWechatMerchantCertSerial(config.WechatCert)
+}
+
+func loadWechatPayPublicKey(publicKeyPEM string) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode([]byte(strings.TrimSpace(publicKeyPEM)))
+	if block == nil {
+		return nil, fmt.Errorf("decode wechat pay public key failed")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse wechat pay public key failed: %w", err)
+	}
+	publicKey, ok := parsed.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("wechat pay public key is not RSA")
+	}
+	return publicKey, nil
+}
+
+func NewWechatPayClient(config *model.PaymentConfig, notifyPath string) (*WechatPayClient, error) {
+	if err := validateWechatPayConfig(config); err != nil {
+		return nil, err
 	}
 
 	privateKey, err := utils.LoadPrivateKeyWithPath(config.WechatPrivateKey)
@@ -41,18 +102,39 @@ func NewWechatPayClient(config *model.PaymentConfig, notifyPath string) (*Wechat
 		}
 	}
 
-	ctx := context.Background()
-	if err := downloader.MgrInstance().RegisterDownloaderWithPrivateKey(ctx, privateKey, config.WechatSerialNo, config.WechatMchID, config.WechatAPIKey); err != nil {
-		return nil, fmt.Errorf("register wechat pay downloader failed: %w", err)
-	}
-
-	client, err := core.NewClient(ctx, option.WithWechatPayAutoAuthCipher(config.WechatMchID, config.WechatSerialNo, privateKey, config.WechatAPIKey))
+	serialNo, err := getWechatMerchantSerialNo(config)
 	if err != nil {
-		return nil, fmt.Errorf("init wechat pay client failed: %w", err)
+		return nil, err
 	}
 
-	certificateVisitor := downloader.MgrInstance().GetCertificateVisitor(config.WechatMchID)
-	handler := notify.NewNotifyHandler(config.WechatAPIKey, verifiers.NewSHA256WithRSAVerifier(certificateVisitor))
+	ctx := context.Background()
+	var client *core.Client
+	var handler *notify.Handler
+
+	if config.WechatAuthMode == "public_key" {
+		if config.WechatPublicKeyID == "" || config.WechatPublicKey == "" {
+			return nil, fmt.Errorf("wechat pay public key config is incomplete")
+		}
+		publicKey, err := loadWechatPayPublicKey(config.WechatPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		client, err = core.NewClient(ctx, option.WithWechatPayPublicKeyAuthCipher(config.WechatMchID, serialNo, privateKey, config.WechatPublicKeyID, publicKey))
+		if err != nil {
+			return nil, fmt.Errorf("init wechat pay public key client failed: %w", err)
+		}
+		handler = notify.NewNotifyHandler(config.WechatAPIKey, verifiers.NewSHA256WithRSAPubkeyVerifier(config.WechatPublicKeyID, *publicKey))
+	} else {
+		if err := downloader.MgrInstance().RegisterDownloaderWithPrivateKey(ctx, privateKey, serialNo, config.WechatMchID, config.WechatAPIKey); err != nil {
+			return nil, fmt.Errorf("register wechat pay downloader failed: %w", err)
+		}
+		client, err = core.NewClient(ctx, option.WithWechatPayAutoAuthCipher(config.WechatMchID, serialNo, privateKey, config.WechatAPIKey))
+		if err != nil {
+			return nil, fmt.Errorf("init wechat pay client failed: %w", err)
+		}
+		certificateVisitor := downloader.MgrInstance().GetCertificateVisitor(config.WechatMchID)
+		handler = notify.NewNotifyHandler(config.WechatAPIKey, verifiers.NewSHA256WithRSAVerifier(certificateVisitor))
+	}
 
 	notifyURL := config.NotifyURL
 	if notifyURL == "" {

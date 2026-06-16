@@ -6,6 +6,7 @@ type PaymentConfig struct {
 	ID          int    `json:"id" gorm:"primaryKey"`
 	Provider    string `json:"provider" gorm:"type:varchar(50);not null;uniqueIndex"`
 	Name        string `json:"name" gorm:"type:varchar(100);not null"`
+	LegacyType  string `json:"-" gorm:"column:type;type:varchar(50);not null"`
 	DisplayName string `json:"display_name" gorm:"type:varchar(100)"`
 	IconURL     string `json:"icon_url" gorm:"type:text"`
 	Enabled     bool   `json:"enabled" gorm:"default:false"`
@@ -18,12 +19,16 @@ type PaymentConfig struct {
 	AlipayPublicCert    string `json:"alipay_public_cert" gorm:"type:text"`
 	AlipayRootCert      string `json:"alipay_root_cert" gorm:"type:text"`
 
-	WechatAppID      string `json:"wechat_app_id" gorm:"type:varchar(255)"`
-	WechatMchID      string `json:"wechat_mch_id" gorm:"type:varchar(255)"`
-	WechatAPIKey     string `json:"wechat_api_key" gorm:"type:varchar(255)"`
-	WechatSerialNo   string `json:"wechat_serial_no" gorm:"type:varchar(255)"`
-	WechatPrivateKey string `json:"wechat_private_key" gorm:"type:text"`
-	WechatCert       string `json:"wechat_cert" gorm:"type:text"`
+	WechatAppID       string `json:"wechat_app_id" gorm:"type:varchar(255)"`
+	WechatAppSecret   string `json:"wechat_app_secret" gorm:"type:text"`
+	WechatMchID       string `json:"wechat_mch_id" gorm:"type:varchar(255)"`
+	WechatAPIKey      string `json:"wechat_api_key" gorm:"type:text"`
+	WechatSerialNo    string `json:"wechat_serial_no" gorm:"type:varchar(255)"`
+	WechatPrivateKey  string `json:"wechat_private_key" gorm:"type:text"`
+	WechatCert        string `json:"wechat_cert" gorm:"type:text"`
+	WechatAuthMode    string `json:"wechat_auth_mode" gorm:"type:varchar(32);default:'certificate'"`
+	WechatPublicKeyID string `json:"wechat_public_key_id" gorm:"type:varchar(255)"`
+	WechatPublicKey   string `json:"wechat_public_key" gorm:"type:text"`
 
 	GatewayURL  string `json:"gateway_url" gorm:"type:varchar(500)"`
 	NotifyURL   string `json:"notify_url" gorm:"type:varchar(500)"`

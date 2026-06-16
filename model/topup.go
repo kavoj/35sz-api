@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -533,6 +534,17 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 	return nil
 }
 
+func getPaymentConfigTopUpQuotaAmount(topUp *TopUp) decimal.Decimal {
+	amount := decimal.NewFromInt(topUp.Amount)
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeCNY || operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeCustom {
+		price := operation_setting.Price
+		if price > 0 {
+			return decimal.NewFromFloat(topUp.Money).Div(decimal.NewFromFloat(price))
+		}
+	}
+	return amount
+}
+
 func rechargePaymentConfigTopUp(tradeNo string, expectedPaymentProvider string, logProviderName string, callerIp string) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
@@ -561,7 +573,7 @@ func rechargePaymentConfigTopUp(tradeNo string, expectedPaymentProvider string, 
 			return errors.New("充值订单状态错误")
 		}
 
-		quotaToAdd = int(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		quotaToAdd = int(getPaymentConfigTopUpQuotaAmount(topUp).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
 		if quotaToAdd <= 0 {
 			return errors.New("无效的充值额度")
 		}

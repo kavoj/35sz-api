@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useEffect } from 'react'
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -35,12 +34,16 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  formatCurrency,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
   calculatePresetPricing,
+  displayAmountToTopupAmount,
+  getPresetAmountDisplay,
+  formatWalletPaymentAmount,
+  getWalletRechargeCurrencySymbol,
 } from '../lib'
+import { getPaymentMethodDisplayName } from '../lib/payment-method-display'
 import type {
   PaymentMethod,
   PresetAmount,
@@ -113,14 +116,16 @@ export function RechargeFormCard({
   const [localAmount, setLocalAmount] = useState(topupAmount.toString())
 
   useEffect(() => {
-    setLocalAmount(topupAmount.toString())
+    setLocalAmount(Number.isFinite(topupAmount) ? topupAmount.toString() : '0')
   }, [topupAmount])
 
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
-    const numValue = parseInt(value) || 0
-    if (numValue >= 0) {
-      onTopupAmountChange(numValue)
+    const displayValue = parseFloat(value) || 0
+    if (displayValue >= 0) {
+      onTopupAmountChange(
+        displayAmountToTopupAmount(displayValue, usdExchangeRate)
+      )
     }
   }
 
@@ -225,7 +230,6 @@ export function RechargeFormCard({
                         topupInfo?.discount?.[preset.value] ||
                         1.0
                       const {
-                        displayValue,
                         actualPrice,
                         savedAmount,
                         hasDiscount,
@@ -234,6 +238,10 @@ export function RechargeFormCard({
                         priceRatio,
                         discount,
                         usdExchangeRate
+                      )
+                      const amountDisplay = getPresetAmountDisplay(
+                        preset.value,
+                        actualPrice
                       )
                       return (
                         <Button
@@ -249,7 +257,7 @@ export function RechargeFormCard({
                         >
                           <div className='flex w-full items-center justify-between'>
                             <div className='text-base font-semibold sm:text-lg'>
-                              {formatNumber(displayValue)}
+                              {amountDisplay.primary}
                             </div>
                             {hasDiscount && (
                               <div className='text-xs font-medium text-green-600'>
@@ -257,15 +265,18 @@ export function RechargeFormCard({
                               </div>
                             )}
                           </div>
-                          <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            Pay {formatCurrency(actualPrice)}
-                            {hasDiscount && savedAmount > 0 && (
-                              <span className='text-green-600'>
-                                {' '}
-                                • Save {formatCurrency(savedAmount)}
-                              </span>
-                            )}
-                          </div>
+                          {(amountDisplay.secondary ||
+                            (hasDiscount && savedAmount > 0)) && (
+                            <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
+                              {amountDisplay.secondary}
+                              {hasDiscount && savedAmount > 0 && (
+                                <span className='text-green-600'>
+                                  {' '}
+                                  • Save {formatWalletPaymentAmount(savedAmount)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </Button>
                       )
                     })}
@@ -278,7 +289,7 @@ export function RechargeFormCard({
                   htmlFor='topup-amount'
                   className='text-muted-foreground text-xs font-medium tracking-wider uppercase'
                 >
-                  {t('Custom Amount')}
+                  {t('Custom Amount')} ({getWalletRechargeCurrencySymbol()})
                 </Label>
                 <div className='grid grid-cols-[minmax(0,1fr)_minmax(110px,0.55fr)] gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center'>
                   <Input
@@ -298,7 +309,7 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {formatWalletPaymentAmount(paymentAmount)}
                       </span>
                     )}
                   </div>
@@ -333,7 +344,9 @@ export function RechargeFormCard({
                               method.name
                             )
                           )}
-                          <span className='truncate'>{method.name}</span>
+                          <span className='truncate'>
+                            {getPaymentMethodDisplayName(method.name, t)}
+                          </span>
                         </Button>
                       )
 
@@ -396,7 +409,9 @@ export function RechargeFormCard({
                             ) : (
                               getPaymentIcon('waffo')
                             )}
-                            <span className='truncate'>{method.name}</span>
+                            <span className='truncate'>
+                            {getPaymentMethodDisplayName(method.name, t)}
+                          </span>
                           </Button>
                         )
 

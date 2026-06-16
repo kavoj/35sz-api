@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { formatLocalCurrencyAmount, getCurrencyDisplay } from '@/lib/currency'
 import { DEFAULT_DISCOUNT_RATE } from '../constants'
 
 // ============================================================================
@@ -79,13 +80,13 @@ export function calculatePresetPricing(
   presetValue: number,
   priceRatio: number,
   discount: number,
-  usdExchangeRate: number = 1
+  _usdExchangeRate: number = 1
 ) {
   const originalPrice = presetValue * priceRatio
   const actualPrice = originalPrice * discount
   const savedAmount = originalPrice - actualPrice
   const hasDiscount = discount < 1.0
-  const displayValue = presetValue * usdExchangeRate
+  const displayValue = presetValue
 
   return {
     displayValue,
@@ -94,4 +95,67 @@ export function calculatePresetPricing(
     savedAmount,
     hasDiscount,
   }
+}
+
+export function formatWalletDisplayAmount(amountUsd: number): string {
+  return formatLocalCurrencyAmount(amountUsd, {
+    digitsLarge: 2,
+    digitsSmall: 2,
+    abbreviate: false,
+  })
+}
+
+export function getPresetAmountDisplay(
+  rechargeAmount: number,
+  paymentAmount: number
+): { primary: string; secondary: string } {
+  const { config } = getCurrencyDisplay()
+  if (config.quotaDisplayType === 'USD') {
+    return {
+      primary: formatWalletDisplayAmount(rechargeAmount),
+      secondary: `Pay ${formatWalletPaymentAmount(paymentAmount)}`,
+    }
+  }
+  return {
+    primary: formatWalletPaymentAmount(paymentAmount),
+    secondary: '',
+  }
+}
+
+export function getPresetTopupAmount(
+  rechargeAmount: number,
+  paymentAmount: number
+): number {
+  const { config } = getCurrencyDisplay()
+  return config.quotaDisplayType === 'USD' ? rechargeAmount : paymentAmount
+}
+
+export function getWalletRechargeCurrencySymbol(): string {
+  const { config, meta } = getCurrencyDisplay()
+  if (meta.kind === 'custom') return meta.symbol
+  if (config.quotaDisplayType === 'CNY') return '¥'
+  return '$'
+}
+
+export function formatWalletConfirmationTopupAmount(amount: number): string {
+  return formatWalletDisplayAmount(amount)
+}
+
+export function formatWalletPaymentAmount(amount: number): string {
+  if (amount == null || Number.isNaN(amount)) return '-'
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'CNY',
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.abs(amount) >= 1 ? 2 : 4,
+  }).format(amount)
+}
+
+export function displayAmountToTopupAmount(
+  displayAmount: number,
+  _usdExchangeRate: number
+): number {
+  if (!Number.isFinite(displayAmount)) return 0
+  return displayAmount
 }

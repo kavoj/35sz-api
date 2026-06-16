@@ -63,7 +63,7 @@ require (
 require (
 	github.com/smartwalle/alipay/v3 v3.2.29
 	github.com/waffo-com/waffo-pancake-sdk-go v0.3.1
-	github.com/wechatpay-apiv3/wechatpay-go v0.2.12
+	github.com/wechatpay-apiv3/wechatpay-go v0.2.21
 	gorm.io/driver/sqlite v1.4.3
 )
 

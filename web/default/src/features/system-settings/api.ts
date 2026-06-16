@@ -95,6 +95,9 @@ export async function getPaymentConfigByProvider(
 
 export async function createPaymentConfig(request: PaymentConfig) {
   const res = await api.post<PaymentConfigResponse>('/api/payment-config/', request)
+  if (!res.data.success) {
+    throw new Error(res.data.message || 'Failed to create payment config')
+  }
   return res.data
 }
 
@@ -103,5 +106,8 @@ export async function updatePaymentConfig(id: number, request: PaymentConfig) {
     `/api/payment-config/${id}`,
     request
   )
+  if (!res.data.success) {
+    throw new Error(res.data.message || 'Failed to update payment config')
+  }
   return res.data
 }

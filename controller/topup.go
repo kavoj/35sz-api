@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,28 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func filterLegacyEpayPaymentMethods(methods []map[string]string, epayEnabled bool) []map[string]string {
+	if epayEnabled {
+		return methods
+	}
+	return []map[string]string{}
+}
+
+func filterLegacyNativePaymentMethods(methods []map[string]string, removeWechat bool, removeAlipay bool) []map[string]string {
+	filtered := make([]map[string]string, 0, len(methods))
+	for _, method := range methods {
+		methodType := strings.ToLower(strings.TrimSpace(method["type"]))
+		if removeWechat && (methodType == "wxpay" || methodType == "wechat" || strings.HasPrefix(methodType, "wxpay_")) {
+			continue
+		}
+		if removeAlipay && (methodType == "alipay" || strings.HasPrefix(methodType, "alipay_")) {
+			continue
+		}
+		filtered = append(filtered, method)
+	}
+	return filtered
+}
+
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
@@ -29,6 +52,7 @@ func GetTopUpInfo(c *gin.Context) {
 	if !complianceConfirmed {
 		payMethods = []map[string]string{}
 	}
+	payMethods = filterLegacyEpayPaymentMethods(payMethods, isEpayTopUpEnabled())
 
 	// 如果启用了 Stripe 支付，添加到支付方法列表
 	if isStripeTopUpEnabled() {
@@ -103,11 +127,12 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	enableAlipay := isAlipayTopUpEnabled()
+	enableWechat := isWechatTopUpEnabled()
+	payMethods = filterLegacyNativePaymentMethods(payMethods, enableWechat, enableAlipay)
 	if enableAlipay {
 		appendPaymentConfigMethod(model.PaymentProviderAlipay, model.PaymentMethodAlipayPC, "Alipay", "#1677FF")
 	}
 
-	enableWechat := isWechatTopUpEnabled()
 	if enableWechat {
 		appendPaymentConfigMethod(model.PaymentProviderWechat, model.PaymentMethodWechatNative, "WeChat Pay", "#07C160")
 	}
@@ -203,6 +228,9 @@ func getPayMoney(amount int64, group string) float64 {
 
 	dTopupGroupRatio := decimal.NewFromFloat(topupGroupRatio)
 	dPrice := decimal.NewFromFloat(operation_setting.Price)
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeCNY || operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeCustom {
+		dPrice = decimal.NewFromInt(1)
+	}
 	// apply optional preset discount by the original request amount (if configured), default 1.0
 	discount := 1.0
 	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amount)]; ok {

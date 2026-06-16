@@ -21,7 +21,7 @@ import * as z from 'zod'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Code2, Eye, Save, ShieldAlert } from 'lucide-react'
+import { Code2, Copy, Eye, Save, ShieldAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -43,6 +43,13 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -72,6 +79,7 @@ import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
+import { getWechatPemFileKind } from './wechat-pay-file-upload'
 import {
   formatJsonForEditor,
   getJsonError,
@@ -210,7 +218,68 @@ function GatewaySwitchRow(props: {
 type NativePaymentProvider = 'alipay' | 'wxpay'
 
 function getNativePaymentDisplayName(provider: NativePaymentProvider) {
-  return provider === 'alipay' ? 'Alipay' : 'Wechat Pay'
+  return provider === 'alipay' ? 'Alipay' : 'WeChat Pay'
+}
+
+function RequiredLabel(props: { children: React.ReactNode }) {
+  return (
+    <Label>
+      {props.children}
+      <span className='text-destructive ml-1'>*</span>
+    </Label>
+  )
+}
+
+function WechatPemUploadField(props: {
+  expectedKind: 'cert' | 'key'
+  onLoad: (content: string) => void
+}) {
+  const { t } = useTranslation()
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const expectedName =
+    props.expectedKind === 'cert' ? 'apiclient_cert.pem' : 'apiclient_key.pem'
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const kind = getWechatPemFileKind(file.name)
+    if (kind !== props.expectedKind) {
+      toast.error(
+        t('Please upload {{fileName}}', {
+          fileName: expectedName,
+        })
+      )
+      event.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (loadEvent) => {
+      if (typeof loadEvent.target?.result === 'string') {
+        props.onLoad(loadEvent.target.result)
+        toast.success(t('File loaded'))
+      }
+    }
+    reader.readAsText(file)
+    event.target.value = ''
+  }
+
+  return (
+    <div className='flex items-center gap-2'>
+      <input
+        ref={inputRef}
+        type='file'
+        accept='.pem,text/plain'
+        className='hidden'
+        onChange={handleChange}
+      />
+      <Button type='button' variant='outline' onClick={() => inputRef.current?.click()}>
+        {t('Upload {{fileName}}', { fileName: expectedName })}
+      </Button>
+      <span className='text-muted-foreground text-xs'>{expectedName}</span>
+    </div>
+  )
 }
 
 function PaymentIconUploadField(props: {
@@ -323,10 +392,14 @@ const paymentConfigComparableFields: Array<keyof PaymentConfig> = [
   'alipay_public_cert',
   'alipay_root_cert',
   'wechat_app_id',
+  'wechat_app_secret',
   'wechat_mch_id',
   'wechat_api_key',
   'wechat_serial_no',
   'wechat_private_key',
+  'wechat_auth_mode',
+  'wechat_public_key_id',
+  'wechat_public_key',
   'gateway_url',
   'notify_url',
   'return_url',
@@ -417,6 +490,7 @@ export function PaymentSettingsSection({
     display_name: getNativePaymentDisplayName('wxpay'),
     enabled: false,
     sort_order: 20,
+    wechat_auth_mode: 'certificate',
   })
   const [waffoPayMethods, setWaffoPayMethods] = React.useState<PayMethod[]>(
     () => parseWaffoPayMethods(waffoDefaultValues.WaffoPayMethods)
@@ -446,9 +520,7 @@ export function PaymentSettingsSection({
       toast.success(t('Payment configuration saved successfully'))
       refetchPaymentConfigs()
     },
-    onError: (error: Error) => {
-      toast.error(error.message || t('Failed to save payment configuration'))
-    },
+    onError: () => {},
   })
 
   const updatePaymentConfigMutation = useMutation({
@@ -458,9 +530,7 @@ export function PaymentSettingsSection({
       toast.success(t('Payment configuration saved successfully'))
       refetchPaymentConfigs()
     },
-    onError: (error: Error) => {
-      toast.error(error.message || t('Failed to save payment configuration'))
-    },
+    onError: () => {},
   })
 
   React.useEffect(() => {
@@ -478,6 +548,7 @@ export function PaymentSettingsSection({
       setWechatForm({
         ...wechat,
         display_name: getNativePaymentDisplayName('wxpay'),
+        wechat_auth_mode: wechat.wechat_auth_mode || 'certificate',
       })
     }
   }, [paymentConfigs])
@@ -649,7 +720,11 @@ export function PaymentSettingsSection({
       toast.success(t('Alipay configuration saved successfully'))
       await refetchPaymentConfigs()
     } catch (error) {
-      toast.error(t('Failed to save Alipay configuration'))
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to save Alipay configuration')
+      )
     }
   }
 
@@ -658,6 +733,7 @@ export function PaymentSettingsSection({
     const data = {
       ...wechatForm,
       display_name: getNativePaymentDisplayName('wxpay'),
+      wechat_auth_mode: wechatForm.wechat_auth_mode || 'certificate',
     } as PaymentConfig
     try {
       if (wechatConfig?.id) {
@@ -671,7 +747,11 @@ export function PaymentSettingsSection({
       toast.success(t('WeChat Pay configuration saved successfully'))
       await refetchPaymentConfigs()
     } catch (error) {
-      toast.error(t('Failed to save WeChat Pay configuration'))
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to save WeChat Pay configuration')
+      )
     }
   }
 
@@ -1059,6 +1139,10 @@ export function PaymentSettingsSection({
   }
 
   const currentFormValues = form.watch()
+  const wechatOfficialAccountServerURL =
+    typeof window === 'undefined'
+      ? 'https://api.35sz.top/api/auth/wechat-callback'
+      : `${window.location.origin}/api/auth/wechat-callback`
   const waffoValues: WaffoSettingsValues = {
     WaffoEnabled: currentFormValues.WaffoEnabled,
     WaffoApiKey: currentFormValues.WaffoApiKey,
@@ -1704,42 +1788,161 @@ export function PaymentSettingsSection({
                   }
                 />
 
-                <div className='grid gap-4 sm:grid-cols-2'>
-                  <div className='space-y-2'>
-                    <Label>{t('App ID')}</Label>
-                    <Input
-                      value={wechatForm.wechat_app_id || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_app_id: event.target.value }))}
-                    />
+                <div className='space-y-3 rounded-md border p-4'>
+                  <div>
+                    <h4 className='text-sm font-medium'>{t('WeChat application configuration')}</h4>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Enter the AppID of the Official Account, Mini Program, or WeChat Open Platform website application bound to the WeChat merchant ID. Native QR payment only requires AppID; AppSecret is only used for WeChat login, web authorization, or JSAPI payment.')}
+                    </p>
+                  </div>
+                  <div className='grid gap-4 sm:grid-cols-2'>
+                    <div className='space-y-2'>
+                      <RequiredLabel>{t('App ID')}</RequiredLabel>
+                      <Input
+                        value={wechatForm.wechat_app_id || ''}
+                        onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_app_id: event.target.value }))}
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label>{t('AppSecret')}</Label>
+                      <Input
+                        type='password'
+                        value={wechatForm.wechat_app_secret || ''}
+                        onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_app_secret: event.target.value }))}
+                        placeholder={wechatConfig ? t('Leave blank to keep the existing key') : t('Enter AppSecret')}
+                      />
+                      <p className='text-muted-foreground text-xs'>
+                        {t('Native QR payment does not require AppSecret. It is only needed for Official Account authorization, WeChat login, or JSAPI payment.')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='space-y-3 rounded-md border p-4'>
+                  <div>
+                    <h4 className='text-sm font-medium'>{t('WeChat merchant platform configuration')}</h4>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Configure merchant credentials from WeChat Pay merchant platform.')}
+                    </p>
                   </div>
                   <div className='space-y-2'>
-                    <Label>{t('Merchant ID')}</Label>
+                    <RequiredLabel>{t('WeChat merchant ID (MCHID)')}</RequiredLabel>
                     <Input
                       value={wechatForm.wechat_mch_id || ''}
                       onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_mch_id: event.target.value }))}
                     />
                   </div>
-                </div>
-                <div className='grid gap-4 sm:grid-cols-2'>
                   <div className='space-y-2'>
-                    <Label>{t('APIv3 Key')}</Label>
-                    <Input
-                      type='password'
-                      value={wechatForm.wechat_api_key || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_api_key: event.target.value }))}
-                      placeholder={wechatConfig ? t('Leave blank to keep the existing key') : t('Enter APIv3 Key')}
-                    />
+                    <Label>{t('Authentication mode')}</Label>
+                    <Select
+                      items={[
+                        { value: 'certificate', label: t('Platform certificate mode') },
+                        { value: 'public_key', label: t('WeChat Pay public key mode') },
+                      ]}
+                      value={wechatForm.wechat_auth_mode || 'certificate'}
+                      onValueChange={(value) =>
+                        value &&
+                        setWechatForm((prev) => ({
+                          ...prev,
+                          wechat_auth_mode: value as 'certificate' | 'public_key',
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='certificate'>
+                          {t('Platform certificate mode')}
+                        </SelectItem>
+                        <SelectItem value='public_key'>
+                          {t('WeChat Pay public key mode')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Public key mode uses PUB_KEY_ID and the WeChat Pay public key for response verification.')}
+                    </p>
                   </div>
+
                   <div className='space-y-2'>
-                    <Label>{t('Certificate Serial No')}</Label>
-                    <Input
-                      value={wechatForm.wechat_serial_no || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_serial_no: event.target.value }))}
+                    <RequiredLabel>{t('WeChat Pay certificate (apiclient_cert.pem)')}</RequiredLabel>
+                    <WechatPemUploadField
+                      expectedKind='cert'
+                      onLoad={(content) =>
+                        setWechatForm((prev) => ({ ...prev, wechat_cert: content }))
+                      }
                     />
+                    <Textarea
+                      rows={4}
+                      value={wechatForm.wechat_cert ? t('Certificate content loaded. Upload a new apiclient_cert.pem to replace it.') : ''}
+                      readOnly
+                      onCopy={(event) => event.preventDefault()}
+                      placeholder='-----BEGIN CERTIFICATE-----'
+                      className='font-mono text-xs'
+                    />
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Paste apiclient_cert.pem content. The merchant API certificate serial number can be parsed from it.')}
+                    </p>
                   </div>
                 </div>
+
                 <div className='space-y-2'>
-                  <Label>{t('Merchant private key')}</Label>
+                  {(wechatForm.wechat_auth_mode || 'certificate') === 'public_key' ? (
+                    <Label>{t('Merchant API key (paySignKey) optional')}</Label>
+                  ) : (
+                    <RequiredLabel>{t('Merchant API key (paySignKey)')}</RequiredLabel>
+                  )}
+                  <WechatPemUploadField
+                    expectedKind='key'
+                    onLoad={(content) =>
+                      setWechatForm((prev) => ({ ...prev, wechat_api_key: content }))
+                    }
+                  />
+                  <Textarea
+                    rows={3}
+                    value={wechatForm.wechat_api_key || ''}
+                    onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_api_key: event.target.value }))}
+                    placeholder={wechatConfig ? t('Leave blank to keep the existing key') : t('Enter APIv3 Key')}
+                    className='font-mono text-xs'
+                  />
+                  <p className='text-muted-foreground text-xs'>
+                    {(wechatForm.wechat_auth_mode || 'certificate') === 'public_key'
+                      ? t('Public key mode does not use APIv3 Key for response signature verification. Keep it only if encrypted notifications need to be decrypted.')
+                      : t('APIv3 Key is used to decrypt payment notifications. It is different from PUB_KEY_ID.')}
+                  </p>
+                </div>
+
+                {(wechatForm.wechat_auth_mode || 'certificate') === 'public_key' ? (
+                  <div className='grid gap-4 sm:grid-cols-2'>
+                    <div className='space-y-2'>
+                      <RequiredLabel>{t('WeChat Pay public key ID')}</RequiredLabel>
+                      <Input
+                        value={wechatForm.wechat_public_key_id || ''}
+                        onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_public_key_id: event.target.value }))}
+                        placeholder='PUB_KEY_ID_...'
+                      />
+                    </div>
+                    <div className='space-y-2 sm:col-span-2'>
+                      <RequiredLabel>{t('WeChat Pay public key')}</RequiredLabel>
+                      <Textarea
+                        rows={5}
+                        value={wechatForm.wechat_public_key || ''}
+                        onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_public_key: event.target.value }))}
+                        placeholder='-----BEGIN PUBLIC KEY-----'
+                        className='font-mono text-xs'
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className='space-y-2'>
+                  <RequiredLabel>{t('WeChat Pay certificate private key (apiclient_key.pem)')}</RequiredLabel>
+                  <WechatPemUploadField
+                    expectedKind='key'
+                    onLoad={(content) =>
+                      setWechatForm((prev) => ({ ...prev, wechat_private_key: content }))
+                    }
+                  />
                   <Textarea
                     rows={4}
                     value={wechatForm.wechat_private_key || ''}
@@ -1748,30 +1951,29 @@ export function PaymentSettingsSection({
                   />
                 </div>
 
-                <div className='grid gap-4 sm:grid-cols-3'>
                   <div className='space-y-2'>
-                    <Label>{t('Gateway URL')}</Label>
-                    <Input
-                      value={wechatForm.gateway_url || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, gateway_url: event.target.value }))}
-                    />
-                  </div>
-                  <div className='space-y-2'>
-                    <Label>{t('Notify URL')}</Label>
-                    <Input
-                      value={wechatForm.notify_url || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, notify_url: event.target.value }))}
-                    />
-                  </div>
-                  <div className='space-y-2'>
-                    <Label>{t('Return URL')}</Label>
-                    <Input
-                      value={wechatForm.return_url || ''}
-                      onChange={(event) => setWechatForm(prev => ({ ...prev, return_url: event.target.value }))}
-                    />
+                    <Label>{t('Official Account server URL')}</Label>
+                    <div className='flex gap-2'>
+                      <Input value={wechatOfficialAccountServerURL} readOnly />
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='icon'
+                        onClick={() => {
+                          void navigator.clipboard.writeText(
+                            wechatOfficialAccountServerURL
+                          )
+                          toast.success(t('Copied'))
+                        }}
+                      >
+                        <Copy className='h-4 w-4' />
+                      </Button>
+                    </div>
+                    <p className='text-muted-foreground text-xs'>
+                      {t('Log in to WeChat Official Account Platform, then go to Development > Basic Configuration > Server Configuration and paste this URL.')}
+                    </p>
                   </div>
                 </div>
-              </div>
             ) : null}
           </TabsContent>
 
