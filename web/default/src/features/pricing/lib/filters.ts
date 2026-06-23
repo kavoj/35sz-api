@@ -22,6 +22,7 @@ import {
   QUOTA_TYPES,
   QUOTA_TYPE_VALUES,
 } from '../constants'
+import { matchesCapabilityTab, type CapabilityTabValue } from './capabilities'
 import type { PricingModel } from '../types'
 
 // ----------------------------------------------------------------------------
@@ -128,10 +129,12 @@ export function filterAndSortModels(
     group: string
     quotaType: string
     tag: string
+    capability: CapabilityTabValue
     sortBy: string
   }
 ): PricingModel[] {
-  let result = filterBySearch(models, filters.search)
+  let result = models.filter((m) => matchesCapabilityTab(m, filters.capability))
+  result = filterBySearch(result, filters.search)
   result = filterByVendor(result, filters.vendor)
   result = filterByGroup(result, filters.group)
   result = filterByQuotaType(result, filters.quotaType)

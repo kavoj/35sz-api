@@ -29,6 +29,9 @@ const pricingSearchSchema = z.object({
   group: z.string().optional(),
   quotaType: z.string().optional(),
   tag: z.string().optional(),
+  capability: z
+    .enum(['all', 'text', 'code', 'multimodal', 'image', 'video'])
+    .optional(),
   tokenUnit: z.enum(['M', 'K']).optional(),
   view: z.enum(['card', 'table']).optional().catch(undefined),
   rechargePrice: z.boolean().optional(),

@@ -27,6 +27,7 @@ import {
   type ViewMode,
 } from '../constants'
 import { filterAndSortModels, extractAllTags } from '../lib/filters'
+import type { CapabilityTabValue } from '../lib/capabilities'
 import type { PricingModel, TokenUnit } from '../types'
 
 type FilterState = {
@@ -36,6 +37,7 @@ type FilterState = {
   group?: string
   quotaType?: string
   tag?: string
+  capability?: CapabilityTabValue
   tokenUnit?: TokenUnit
   view?: ViewMode
   rechargePrice?: boolean
@@ -57,6 +59,7 @@ export function useFilters(models: PricingModel[]) {
     group: search.group,
     quotaType: search.quotaType,
     tag: search.tag,
+    capability: search.capability as CapabilityTabValue | undefined,
     tokenUnit: search.tokenUnit,
     view: search.view,
     rechargePrice: search.rechargePrice,
@@ -68,6 +71,7 @@ export function useFilters(models: PricingModel[]) {
   const groupFilter = filterState.group || FILTER_ALL
   const quotaTypeFilter = filterState.quotaType || QUOTA_TYPES.ALL
   const tagFilter = filterState.tag || FILTER_ALL
+  const capabilityTab: CapabilityTabValue = filterState.capability || 'all'
   const tokenUnit: TokenUnit =
     filterState.tokenUnit === 'K' ? 'K' : DEFAULT_TOKEN_UNIT
   const viewMode = normalizeViewMode(filterState.view)
@@ -111,6 +115,11 @@ export function useFilters(models: PricingModel[]) {
     (v: string) => updateFilters({ tag: v === FILTER_ALL ? undefined : v }),
     [updateFilters]
   )
+  const setCapabilityTab = useCallback(
+    (v: CapabilityTabValue) =>
+      updateFilters({ capability: v === 'all' ? undefined : v }),
+    [updateFilters]
+  )
   const setTokenUnit = useCallback(
     (v: TokenUnit) =>
       updateFilters({ tokenUnit: v === DEFAULT_TOKEN_UNIT ? undefined : v }),
@@ -140,6 +149,7 @@ export function useFilters(models: PricingModel[]) {
       group: groupFilter,
       quotaType: quotaTypeFilter,
       tag: tagFilter,
+      capability: capabilityTab,
       sortBy,
     })
   }, [
@@ -149,6 +159,7 @@ export function useFilters(models: PricingModel[]) {
     groupFilter,
     quotaTypeFilter,
     tagFilter,
+    capabilityTab,
     sortBy,
   ])
 
@@ -190,6 +201,7 @@ export function useFilters(models: PricingModel[]) {
     groupFilter,
     quotaTypeFilter,
     tagFilter,
+    capabilityTab,
     tokenUnit,
     viewMode,
     showRechargePrice,
@@ -199,6 +211,7 @@ export function useFilters(models: PricingModel[]) {
     setGroupFilter,
     setQuotaTypeFilter,
     setTagFilter,
+    setCapabilityTab,
     setTokenUnit,
     setViewMode,
     setShowRechargePrice,
