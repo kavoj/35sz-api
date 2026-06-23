@@ -69,6 +69,8 @@ type Model struct {
 
 	MatchedModels []string `json:"matched_models,omitempty" gorm:"-"`
 	MatchedCount  int      `json:"matched_count,omitempty" gorm:"-"`
+
+	ContextLength int `json:"context_length,omitempty" gorm:"default:0"`
 }
 
 func (mi *Model) Insert() error {
@@ -108,7 +110,7 @@ func (mi *Model) Update() error {
 	mi.ModelType = NormalizeModelType(mi.ModelType)
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "model_type", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "updated_time").
+		Select("model_name", "description", "icon", "tags", "model_type", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "context_length", "updated_time").
 		Updates(mi).Error
 }
 
