@@ -54,6 +54,11 @@ func validateWechatPayConfig(config *model.PaymentConfig) error {
 func parseWechatMerchantCertSerial(certPEM string) (string, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(certPEM)))
 	if block == nil {
+		// Tolerate certificates pasted as a single line with literal "\n"
+		// or CRLF endings, mirroring loadWechatPrivateKey.
+		block, _ = pem.Decode([]byte(strings.TrimSpace(normalizeWechatPEM(certPEM))))
+	}
+	if block == nil {
 		return "", fmt.Errorf("decode wechat merchant certificate failed")
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)

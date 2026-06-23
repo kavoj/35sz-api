@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,5 +40,15 @@ func TestParseWechatMerchantCertSerialReturnsUppercaseHex(t *testing.T) {
 	}
 	if serial != "662CEF85BA993BDA113FA1E39C65E38A32F0ECF0" {
 		t.Fatalf("serial = %q", serial)
+	}
+
+	// Tolerate a certificate pasted as a single line with literal "\n".
+	broken := strings.ReplaceAll(certPEM, "\n", "\\n")
+	serial2, err := parseWechatMerchantCertSerial(broken)
+	if err != nil {
+		t.Fatalf("parseWechatMerchantCertSerial(literal-\\n) returned error: %v", err)
+	}
+	if serial2 != "662CEF85BA993BDA113FA1E39C65E38A32F0ECF0" {
+		t.Fatalf("serial2 = %q", serial2)
 	}
 }

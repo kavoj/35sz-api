@@ -1878,9 +1878,8 @@ export function PaymentSettingsSection({
                     />
                     <Textarea
                       rows={4}
-                      value={wechatForm.wechat_cert ? t('Certificate content loaded. Upload a new apiclient_cert.pem to replace it.') : ''}
-                      readOnly
-                      onCopy={(event) => event.preventDefault()}
+                      value={wechatForm.wechat_cert || ''}
+                      onChange={(event) => setWechatForm(prev => ({ ...prev, wechat_cert: event.target.value }))}
                       placeholder='-----BEGIN CERTIFICATE-----'
                       className='font-mono text-xs'
                     />

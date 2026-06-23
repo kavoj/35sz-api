@@ -151,10 +151,16 @@ func SetApiRouter(router *gin.Engine) {
 		}
 
 		// Subscription billing (plans, purchase, admin management)
+		// Public plans listing (pricing info only, no user context). Gated by
+		// payment compliance switch inside the controller. Must be reachable
+		// without login, matching the getPublicPlans frontend intent.
+		subscriptionPublicRoute := apiRouter.Group("/subscription")
+		{
+			subscriptionPublicRoute.GET("/plans", controller.GetSubscriptionPlans)
+		}
 		subscriptionRoute := apiRouter.Group("/subscription")
 		subscriptionRoute.Use(middleware.UserAuth())
 		{
-			subscriptionRoute.GET("/plans", controller.GetSubscriptionPlans)
 			subscriptionRoute.GET("/self", controller.GetSubscriptionSelf)
 			subscriptionRoute.PUT("/self/preference", controller.UpdateSubscriptionPreference)
 			subscriptionRoute.POST("/balance/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestBalancePay)
