@@ -155,17 +155,195 @@ export function getQuotaTypeConfig(
 // Endpoint Templates
 // ============================================================================
 
-export const ENDPOINT_TEMPLATES: Record<
-  string,
-  { path: string; method: string }
-> = {
-  openai: { path: '/v1/chat/completions', method: 'POST' },
-  'openai-response': { path: '/v1/responses', method: 'POST' },
-  anthropic: { path: '/v1/messages', method: 'POST' },
-  gemini: { path: '/v1beta/models/{model}:generateContent', method: 'POST' },
-  'jina-rerank': { path: '/rerank', method: 'POST' },
-  'image-generation': { path: '/v1/images/generations', method: 'POST' },
-  embeddings: { path: '/v1/embeddings', method: 'POST' },
+export interface EndpointTemplate {
+  path: string
+  method: string
+  description?: string
+}
+
+export const ENDPOINT_TEMPLATES: Record<string, EndpointTemplate> = {
+  openai: {
+    path: '/v1/chat/completions',
+    method: 'POST',
+    description: 'OpenAI Chat Completions',
+  },
+  'openai-response': {
+    path: '/v1/responses',
+    method: 'POST',
+    description: 'OpenAI Responses API',
+  },
+  'openai-completions': {
+    path: '/v1/completions',
+    method: 'POST',
+    description: 'OpenAI Legacy Completions',
+  },
+  anthropic: {
+    path: '/v1/messages',
+    method: 'POST',
+    description: 'Anthropic Messages API',
+  },
+  gemini: {
+    path: '/v1beta/models/{model}:generateContent',
+    method: 'POST',
+    description: 'Google Gemini Generate Content',
+  },
+  'image-generation': {
+    path: '/v1/images/generations',
+    method: 'POST',
+    description: 'Image Generation',
+  },
+  embeddings: {
+    path: '/v1/embeddings',
+    method: 'POST',
+    description: 'Text Embeddings',
+  },
+  'jina-rerank': {
+    path: '/rerank',
+    method: 'POST',
+    description: 'Jina Rerank API',
+  },
+  'audio-speech': {
+    path: '/v1/audio/speech',
+    method: 'POST',
+    description: 'Text to Speech',
+  },
+  'audio-transcriptions': {
+    path: '/v1/audio/transcriptions',
+    method: 'POST',
+    description: 'Speech to Text',
+  },
+  'moderations': {
+    path: '/v1/moderations',
+    method: 'POST',
+    description: 'Content Moderation',
+  },
+}
+
+// ============================================================================
+// Capability → Endpoint Hints（能力到端点模板的对照说明）
+// ============================================================================
+
+export interface CapabilityEndpointHint {
+  /** 能力英文 key（用于 i18n） */
+  capability: string
+  /** 推荐填充的 ENDPOINT_TEMPLATES key 列表 */
+  templateKeys: string[]
+  /** 一句话说明（i18n key） */
+  descriptionKey: string
+}
+
+export const CAPABILITY_ENDPOINT_HINTS: CapabilityEndpointHint[] = [
+  {
+    capability: 'chat',
+    templateKeys: ['openai', 'anthropic', 'gemini'],
+    descriptionKey: 'Conversational models. Use chat/messages endpoints.',
+  },
+  {
+    capability: 'completion',
+    templateKeys: ['openai-completions'],
+    descriptionKey: 'Legacy text completion endpoint.',
+  },
+  {
+    capability: 'vision',
+    templateKeys: ['openai', 'anthropic', 'gemini'],
+    descriptionKey: 'Multimodal input. Image understanding via chat endpoints.',
+  },
+  {
+    capability: 'image',
+    templateKeys: ['image-generation'],
+    descriptionKey: 'Image generation endpoint.',
+  },
+  {
+    capability: 'audio',
+    templateKeys: ['audio-speech', 'audio-transcriptions'],
+    descriptionKey: 'Audio speech / transcription endpoints.',
+  },
+  {
+    capability: 'video',
+    templateKeys: ['openai'],
+    descriptionKey: 'Video generation/understanding endpoints.',
+  },
+  {
+    capability: 'embedding',
+    templateKeys: ['embeddings'],
+    descriptionKey: 'Text embedding endpoint.',
+  },
+  {
+    capability: 'code',
+    templateKeys: ['openai', 'anthropic'],
+    descriptionKey: 'Code-focused models via chat endpoints.',
+  },
+  {
+    capability: 'reasoning',
+    templateKeys: ['openai', 'anthropic'],
+    descriptionKey: 'Reasoning models via chat endpoints.',
+  },
+]
+
+// ============================================================================
+// Tag Presets
+// ============================================================================
+
+export const TAG_PRESETS = [
+  {
+    category: 'Model Capabilities',
+    tags: [
+      'chat',
+      'completion',
+      'vision',
+      'image',
+      'audio',
+      'video',
+      'embedding',
+      'code',
+      'reasoning',
+      'function-calling',
+      'tools',
+    ],
+  },
+  {
+    category: 'Quality Levels',
+    tags: [
+      'premium',
+      'high-quality',
+      'standard',
+      'fast',
+      'economical',
+      'experimental',
+    ],
+  },
+  {
+    category: 'Use Cases',
+    tags: [
+      'coding',
+      'writing',
+      'analysis',
+      'translation',
+      'summarization',
+      'creative',
+      'business',
+      'education',
+    ],
+  },
+  {
+    category: 'Content Types',
+    tags: [
+      'safe',
+      'nsfw',
+      'filtered',
+      'unfiltered',
+    ],
+  },
+] as const
+
+// Helper to get translated tag label
+export function getTagLabel(t: (key: string) => string, tag: string): string {
+  return t(tag)
+}
+
+// Helper to get translated category label
+export function getTagCategoryLabel(t: (key: string) => string, category: string): string {
+  return t(category)
 }
 
 // ============================================================================
