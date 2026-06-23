@@ -89,6 +89,39 @@ func loadWechatPayPublicKey(publicKeyPEM string) (*rsa.PublicKey, error) {
 	return publicKey, nil
 }
 
+// loadWechatPrivateKey loads the merchant private key, tolerating common
+// corruptions introduced when the PEM is pasted as a single line — namely
+// literal "\n"/"\r\n" escape sequences (e.g. copied out of a single-line JSON
+// config) and CRLF line endings. It first tries the raw value, then retries
+// once with normalized newlines before giving up.
+func loadWechatPrivateKey(privateKeyPEM string) (*rsa.PrivateKey, error) {
+	key, err := utils.LoadPrivateKey(privateKeyPEM)
+	if err == nil {
+		return key, nil
+	}
+
+	normalized := normalizeWechatPEM(privateKeyPEM)
+	if normalized == privateKeyPEM {
+		return nil, err
+	}
+	if key, retryErr := utils.LoadPrivateKey(normalized); retryErr == nil {
+		return key, nil
+	}
+	return nil, err
+}
+
+// normalizeWechatPEM converts literal escape sequences and CRLF into real
+// newlines so a PEM block damaged by single-line copy/paste can be decoded.
+func normalizeWechatPEM(s string) string {
+	replaced := strings.ReplaceAll(s, "\\r\\n", "\n")
+	replaced = strings.ReplaceAll(replaced, "\\n", "\n")
+	replaced = strings.ReplaceAll(replaced, "\\r", "\n")
+	replaced = strings.ReplaceAll(replaced, "\r\n", "\n")
+	replaced = strings.ReplaceAll(replaced, "\r", "\n")
+	return replaced
+}
+
+
 func NewWechatPayClient(config *model.PaymentConfig, notifyPath string) (*WechatPayClient, error) {
 	if err := validateWechatPayConfig(config); err != nil {
 		return nil, err
@@ -96,7 +129,7 @@ func NewWechatPayClient(config *model.PaymentConfig, notifyPath string) (*Wechat
 
 	privateKey, err := utils.LoadPrivateKeyWithPath(config.WechatPrivateKey)
 	if err != nil {
-		privateKey, err = utils.LoadPrivateKey(config.WechatPrivateKey)
+		privateKey, err = loadWechatPrivateKey(config.WechatPrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("load wechat private key failed: %w", err)
 		}

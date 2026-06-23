@@ -79,7 +79,7 @@ import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
-import { getWechatPemFileKind } from './wechat-pay-file-upload'
+import { detectWechatPemKindByContent } from './wechat-pay-file-upload'
 import {
   formatJsonForEditor,
   getJsonError,
@@ -243,23 +243,26 @@ function WechatPemUploadField(props: {
     const file = event.target.files?.[0]
     if (!file) return
 
-    const kind = getWechatPemFileKind(file.name)
-    if (kind !== props.expectedKind) {
-      toast.error(
-        t('Please upload {{fileName}}', {
-          fileName: expectedName,
-        })
-      )
-      event.target.value = ''
-      return
-    }
-
     const reader = new FileReader()
     reader.onload = (loadEvent) => {
-      if (typeof loadEvent.target?.result === 'string') {
-        props.onLoad(loadEvent.target.result)
-        toast.success(t('File loaded'))
+      if (typeof loadEvent.target?.result !== 'string') {
+        return
       }
+      const content = loadEvent.target.result
+      // Authoritative check by PEM content, not filename. This accepts
+      // renamed files (e.g. "apiclient_cert (1).pem") and rejects files
+      // whose content does not match the expected kind.
+      const kind = detectWechatPemKindByContent(content)
+      if (kind !== props.expectedKind) {
+        toast.error(
+          t('Please upload {{fileName}}', {
+            fileName: expectedName,
+          })
+        )
+        return
+      }
+      props.onLoad(content)
+      toast.success(t('File loaded'))
     }
     reader.readAsText(file)
     event.target.value = ''
