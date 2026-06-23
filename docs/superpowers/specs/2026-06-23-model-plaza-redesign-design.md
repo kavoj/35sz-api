@@ -18,6 +18,7 @@
 - 端点筛选器：**仅改名为「模型能力」并把协议值映射为中文**，筛选逻辑不变。
 - 美化程度：**全面对齐参考页布局**。
 - 筛选器去留：**顶部能力 Tab 主导，厂商/分组/计费类型收进顶部右侧下拉菜单**，移除左侧 `PricingSidebar`。
+- **模型能力的数据来源 = 模型 tags 中设定的能力标签**（chat/completion/vision/image/audio/video/embedding/code/reasoning，即第一轮已做中文翻译的标签集）。`/models/metadata` 编辑抽屉的「标签」字段即设置/纠正模型归类的入口——不准确时由管理员在标签里增删能力标签来修正，**不依赖按模型名推断**。
 
 ## 能力中文映射（统一口径）
 
@@ -40,16 +41,34 @@
 
 用户列出的能力词（对话/补全/视觉/图像/音频/视频/向量/代码/推理）作为通用能力词典，在编辑抽屉的能力→端点对照说明中使用。
 
-顶部能力 Tab 分类（参考页：全部/文本/编码/多模态/图片/视频），按 `model_type` + 推断能力归类：
+### 能力标签词典（顶部 Tab 与卡片能力 chip 的真实来源）
 
-| Tab | 归类规则 |
+模型能力**统一来源于模型 tags**（`model.tags` 逗号分隔字符串）中的能力标签，与第一轮已翻译的标签集一致：
+
+| 能力标签 (tag) | 中文 | 归入顶部 Tab |
+|---------------|------|-------------|
+| chat | 对话 | 文本 |
+| completion | 补全 | 文本 |
+| code | 代码 | 编码 |
+| reasoning | 推理 | 文本 |
+| vision | 视觉 | 多模态 |
+| image | 图像 | 图片 |
+| audio | 音频 | 多模态 |
+| video | 视频 | 视频 |
+| embedding | 向量 | 文本 |
+
+顶部能力 Tab 分类（参考页：全部/文本/编码/多模态/图片/视频），**按模型 tags 中的能力标签归类**（不按模型名推断）：
+
+| Tab | 归类规则（基于 tags） |
 |-----|---------|
 | 全部 | 不筛选 |
-| 文本 | model_type=text 且非纯多模态 |
-| 编码 | tags 或推断 capabilities 含 code/code_interpreter |
-| 多模态 | 输入模态 > 1（含 image/audio/video 输入） |
-| 图片 | model_type=image 或 supported_endpoint_types 含 image-generation |
-| 视频 | model_type=video 或 supported_endpoint_types 含 openai-video |
+| 文本 | tags 含 chat / completion / reasoning / embedding |
+| 编码 | tags 含 code |
+| 多模态 | tags 含 vision / audio（即文本之外的输入能力） |
+| 图片 | tags 含 image |
+| 视频 | tags 含 video |
+
+归类不准时，管理员在 `/models/metadata` 编辑抽屉的「标签」字段增删对应能力标签即可修正——该字段是唯一的归类入口。模型无能力标签时归入「全部」，不出现在具体能力 Tab。
 
 ## 任务 4：端点配置说明 + 能力模板（最先做，零后端依赖）
 
@@ -61,14 +80,17 @@
   - 现有模板下拉 `SelectItem` 的 description 改用中文能力说明。
 - 不改后端，不改数据结构。
 
-## 任务 3：端点筛选器改名「模型能力」+ 中文映射
+## 任务 3：以 tags 能力标签的顶部 Tab 取代端点协议筛选器
 
-文件：`web/default/src/features/pricing/constants.ts`、消费方组件
+文件：`web/default/src/features/pricing/hooks/use-filters.ts`、`pricing-toolbar.tsx`、`index.tsx`、`constants.ts`
 
-- `getEndpointTypeLabels(t)` 把协议值映射为上表中文能力名（值不变，label 改中文）。
-- 顶部右侧下拉中的该筛选标题从 `Endpoint Type` 改为「模型能力」。
-- 筛选逻辑 `filterByEndpointType`（按 `supported_endpoint_types`）不变。
-- i18n：新增中文键到 `zh.json` 与 `static-keys.ts`。
+> 决策（已确认）：「模型能力」统一由顶部能力 Tab（来自 `model.tags`）承载，**原按协议端点（`supported_endpoint_types`）的筛选器与顶部 Tab 职能重叠，予以删除**。这也与参考页一致（参考页只有能力 Tab，无协议筛选器）。
+
+- 移除 `useFilters` 中的 `endpointTypeFilter` 状态、`filterByEndpointType` 调用、相关 `setEndpointTypeFilter` 与 URL 同步。
+- 移除 toolbar/侧边栏中 Endpoint Type 筛选 UI。
+- `constants.ts` 的 `ENDPOINT_TYPES` / `getEndpointTypeLabels` 若无其他引用则一并清理（先 grep 确认无其他消费方）。
+- 顶部能力 Tab 的中文能力名沿用「能力标签词典」表（对话/补全/代码/推理/视觉/图像/音频/视频/向量）。
+- i18n：Tab 文案（全部/文本/编码/多模态/图片/视频）加入 `zh.json` 与 `static-keys.ts`。
 
 ## 任务 2：上下文窗口（后端真实值 + 前端兜底）
 
@@ -101,16 +123,16 @@
 ### 卡片视觉（对齐参考页）
 - 头部：图标 + 模型名（mono）+ 厂商名。
 - 一句话能力描述（复用 description，缺失时按能力生成「支持 X、Y 能力，按 Token 透明计费」）。
-- 能力 chip 行（中文能力名）。
+- 能力 chip 行（中文能力名，来源于 `model.tags` 中的能力标签）。
 - 输入/输出价格行（保留现有 `formatPrice`）。
 - 上下文窗口 chip（任务 2）。
 - 「立即调用 →」按钮（指向控制台/详情）。
 
 ### 组件改动
 - 移除 `PricingSidebar` 的左侧使用；新增顶部 Tab + 下拉筛选区（可在 `PricingToolbar` 内扩展或新增 `PricingTopFilters`）。
-- `useFilters` 增加 `capabilityTab` 状态及对应 `filterByCapabilityTab` 逻辑（基于 model_type + `inferModelMetadata` 推断），与现有 search/vendor/group/quotaType/endpointType 组合。
+- `useFilters` 增加 `capabilityTab` 状态及 `filterByCapabilityTab` 逻辑（**基于 `model.tags` 中的能力标签归类**，见上文「能力标签词典」表，不按模型名推断），与现有 search/vendor/group/quotaType/endpointType 组合。
 - `index.tsx` 的 `grid xl:grid-cols-[330px_1fr]` 两栏布局改为单栏纵向。
-- 标签筛选（tag）：原侧边栏的 Model Tags 筛选移除（任务 2 已把标签列替换为上下文窗口）；如需保留 tag 搜索仍由搜索框覆盖。
+- 标签筛选（tag）：原侧边栏的 Model Tags 独立筛选移除；标签语义已由顶部能力 Tab 承载，标签关键词搜索仍由搜索框覆盖。
 
 ## 实施顺序
 
