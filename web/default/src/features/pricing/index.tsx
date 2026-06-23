@@ -58,7 +58,6 @@ export function Pricing() {
     vendorFilter,
     groupFilter,
     quotaTypeFilter,
-    endpointTypeFilter,
     tagFilter,
     tokenUnit,
     viewMode,
@@ -68,7 +67,6 @@ export function Pricing() {
     setVendorFilter,
     setGroupFilter,
     setQuotaTypeFilter,
-    setEndpointTypeFilter,
     setTagFilter,
     setTokenUnit,
     setViewMode,
@@ -204,12 +202,10 @@ export function Pricing() {
           <div className='grid gap-4 xl:grid-cols-[330px_minmax(0,1fr)]'>
             <PricingSidebar
               quotaTypeFilter={quotaTypeFilter}
-              endpointTypeFilter={endpointTypeFilter}
               vendorFilter={vendorFilter}
               groupFilter={groupFilter}
               tagFilter={tagFilter}
               onQuotaTypeChange={setQuotaTypeFilter}
-              onEndpointTypeChange={setEndpointTypeFilter}
               onVendorChange={setVendorFilter}
               onGroupChange={setGroupFilter}
               onTagChange={setTagFilter}
@@ -236,12 +232,10 @@ export function Pricing() {
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 quotaTypeFilter={quotaTypeFilter}
-                endpointTypeFilter={endpointTypeFilter}
                 vendorFilter={vendorFilter}
                 groupFilter={groupFilter}
                 tagFilter={tagFilter}
                 onQuotaTypeChange={setQuotaTypeFilter}
-                onEndpointTypeChange={setEndpointTypeFilter}
                 onVendorChange={setVendorFilter}
                 onGroupChange={setGroupFilter}
                 onTagChange={setTagFilter}

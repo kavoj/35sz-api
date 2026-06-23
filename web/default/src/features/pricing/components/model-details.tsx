@@ -274,6 +274,7 @@ function ModelHeader(props: { model: PricingModel }) {
     : null
   const description = model.description || model.vendor_description || null
   const tags = parseTags(model.tags)
+  const translatedTags = tags.map(tag => t(tag))
   const isSpecialExpression =
     model.billing_mode === 'tiered_expr' &&
     Boolean(model.billing_expr) &&
@@ -321,11 +322,11 @@ function ModelHeader(props: { model: PricingModel }) {
           {description}
         </p>
       )}
-      {tags.length > 0 && (
+      {translatedTags.length > 0 && (
         <div className='mt-2.5 flex flex-wrap gap-1'>
-          {tags.map((tag) => (
+          {translatedTags.map((tag, index) => (
             <span
-              key={tag}
+              key={tags[index] || tag}
               className='bg-muted text-muted-foreground rounded px-2 py-0.5 text-[11px] font-medium'
             >
               {tag}

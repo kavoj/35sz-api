@@ -55,15 +55,16 @@ export interface PricingColumnsOptions {
 
 function renderLimitedTags(
   items: string[],
+  translatedItems: string[],
   maxDisplay: number = 3
 ): React.ReactNode {
   return (
     <StatusBadgeList
-      items={items}
+      items={translatedItems}
       max={maxDisplay}
-      getKey={(item) => item}
-      renderItem={(item) => (
-        <StatusBadge label={item} autoColor={item} size='sm' copyable={false} />
+      getKey={(item, index) => items[index] || item}
+      renderItem={(item, index) => (
+        <StatusBadge label={item} autoColor={items[index] || item} size='sm' copyable={false} />
       )}
     />
   )
@@ -379,6 +380,7 @@ export function usePricingColumns(
       header: t('Tags'),
       cell: ({ row }) => {
         const tags = parseTags(row.original.tags)
+        const translatedTags = tags.map(tag => t(tag))
         if (tags.length === 0) {
           return <span className='text-muted-foreground/50 text-xs'>—</span>
         }
@@ -387,11 +389,11 @@ export function usePricingColumns(
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger render={<div />}>
-                {renderLimitedTags(tags, 2)}
+                {renderLimitedTags(tags, translatedTags, 2)}
               </TooltipTrigger>
               {tags.length > 2 && (
                 <TooltipContent side='top' className='max-w-[280px] p-2'>
-                  <span className='text-xs'>{tags.join(', ')}</span>
+                  <span className='text-xs'>{translatedTags.join(', ')}</span>
                 </TooltipContent>
               )}
             </Tooltip>
