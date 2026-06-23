@@ -29,3 +29,5 @@ export {
   ModelDetailsDrawer,
 } from './model-details'
 export { PricingTable } from './pricing-table'
+export { PricingHero } from './pricing-hero'
+export { CapabilityTabs } from './capability-tabs'

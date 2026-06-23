@@ -168,6 +168,14 @@ export const STATIC_I18N_KEYS = [
   'Context window',
   'Maximum context tokens supported by this model (e.g. 128000).',
   'Context',
+
+  // Pricing capability tabs & hero
+  'Text',
+  'Code',
+  'Multimodal',
+  'One gateway to access global AI models.',
+  'Vendors',
+  'Service availability',
   'Failed to search redemption codes',
   'Failed to create redemption code',
   'Failed to update redemption code',
