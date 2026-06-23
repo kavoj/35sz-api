@@ -21,6 +21,21 @@ import { formatTimestampToDate } from '@/lib/format'
 import { getNameRuleConfig, getQuotaTypeConfig } from '../constants'
 import type { NameRule, Model } from '../types'
 
+/**
+ * Get translated tag label
+ */
+export function getTranslatedTag(tag: string, t: TFunction): string {
+  return t(tag)
+}
+
+/**
+ * Get translated tags array
+ */
+export function getTranslatedTags(tags: string[] | undefined, t: TFunction): string[] {
+  if (!tags || tags.length === 0) return []
+  return tags.map((tag) => getTranslatedTag(tag, t))
+}
+
 // ============================================================================
 // Time Formatting
 // ============================================================================

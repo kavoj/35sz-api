@@ -36,7 +36,7 @@ import {
   getNameRuleConfig,
   getQuotaTypeConfig,
 } from '../constants'
-import { parseModelTags, formatEndpointsDisplay } from '../lib'
+import { parseModelTags, formatEndpointsDisplay, getTranslatedTags } from '../lib'
 import type { Model, Vendor } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DescriptionCell } from './description-cell'
@@ -278,7 +278,7 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
           <div className='flex items-center gap-1.5'>
             {icon}
             <StatusBadge
-              label={vendor.name}
+              label={vendor.display_name || vendor.name}
               autoColor={vendor.name}
               size='sm'
             />
@@ -318,13 +318,14 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
       cell: ({ row }) => {
         const tags = row.getValue('tags') as string
         const tagArray = parseModelTags(tags)
+        const translatedTags = getTranslatedTags(tagArray, t)
 
         if (tagArray.length === 0) {
           return <span className='text-muted-foreground text-xs'>-</span>
         }
 
         const tagBadges = tagArray.map((tag, idx) => (
-          <StatusBadge key={idx} label={tag} autoColor={tag} size='sm' />
+          <StatusBadge key={idx} label={translatedTags[idx]} autoColor={tag} size='sm' />
         ))
 
         return (

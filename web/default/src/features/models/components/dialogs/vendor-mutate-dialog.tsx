@@ -46,6 +46,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createVendor, updateVendor } from '../../api'
 import { vendorsQueryKeys, modelsQueryKeys } from '../../lib'
 import { vendorFormSchema, type Vendor } from '../../types'
+import { IconSelector } from '@/components/icon-selector'
 
 type VendorMutateDialogProps = {
   open: boolean
@@ -79,6 +80,7 @@ export function VendorMutateDialog({
       form.reset({
         id: currentVendor.id,
         name: currentVendor.name,
+        display_name: currentVendor.display_name || '',
         description: currentVendor.description || '',
         icon: currentVendor.icon || '',
         status: currentVendor.status || 1,
@@ -86,6 +88,7 @@ export function VendorMutateDialog({
     } else if (open && !isEdit) {
       form.reset({
         name: '',
+        display_name: '',
         description: '',
         icon: '',
         status: 1,
@@ -157,6 +160,26 @@ export function VendorMutateDialog({
 
             <FormField
               control={form.control}
+              name='display_name'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Display Name')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Custom display name (optional)')}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Optional custom name to display instead of the vendor name')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name='description'
               render={({ field }) => (
                 <FormItem>
@@ -180,13 +203,14 @@ export function VendorMutateDialog({
                 <FormItem>
                   <FormLabel>{t('Icon')}</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder={t('OpenAI, Anthropic, Google, etc.')}
-                      {...field}
+                    <IconSelector
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={t('Select or upload icon')}
                     />
                   </FormControl>
                   <FormDescription>
-                    {t('@lobehub/icons key name')}
+                    {t('Select from @lobehub/icons or upload custom')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
