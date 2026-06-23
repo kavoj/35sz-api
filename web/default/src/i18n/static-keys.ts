@@ -167,6 +167,7 @@ export const STATIC_I18N_KEYS = [
   'Reasoning models via chat endpoints.',
   'Context window',
   'Maximum context tokens supported by this model (e.g. 128000).',
+  'Context',
   'Failed to search redemption codes',
   'Failed to create redemption code',
   'Failed to update redemption code',

@@ -30,6 +30,7 @@ import {
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
+import { formatTokenCount, inferModelMetadata } from '../lib/model-metadata'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
@@ -55,6 +56,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
   const tags = parseTags(props.model.tags)
   const translatedTags = tags.map(tag => t(tag))
+  const contextLength =
+    props.model.context_length && props.model.context_length > 0
+      ? props.model.context_length
+      : inferModelMetadata(props.model).context_length
   const groups = props.model.enable_groups || []
   const endpoints = props.model.supported_endpoint_types || []
   const modelIconKey = props.model.icon || props.model.vendor_icon
@@ -256,6 +261,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               {item}
             </span>
           ))}
+          <span className='text-muted-foreground/70 text-xs'>
+            {t('Context')} {formatTokenCount(contextLength)}
+          </span>
           <span className='text-muted-foreground/50 text-xs'>
             {tokenUnitLabel}
           </span>
