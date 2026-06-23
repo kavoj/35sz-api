@@ -49,6 +49,7 @@ export interface Model {
   created_time: number
   updated_time: number
   name_rule: number
+  context_length?: number
   // Runtime fields
   bound_channels?: BoundChannel[]
   enable_groups?: string[]
@@ -63,6 +64,7 @@ export interface Model {
 export interface Vendor {
   id: number
   name: string
+  display_name?: string
   description?: string
   icon?: string
   status: number
@@ -243,6 +245,7 @@ export const modelFormSchema = z.object({
   name_rule: z.number().min(0).max(3).default(0),
   status: z.boolean().default(true),
   sync_official: z.boolean().default(true),
+  context_length: z.number().optional(),
 })
 
 export type ModelFormValues = z.infer<typeof modelFormSchema>
@@ -253,6 +256,7 @@ export type ModelFormValues = z.infer<typeof modelFormSchema>
 export const vendorFormSchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1, 'Vendor name is required'),
+  display_name: z.string().default(''),
   description: z.string().default(''),
   icon: z.string().default(''),
   status: z.number().default(1),

@@ -165,6 +165,8 @@ export const STATIC_I18N_KEYS = [
   'Text embedding endpoint.',
   'Code-focused models via chat endpoints.',
   'Reasoning models via chat endpoints.',
+  'Context window',
+  'Maximum context tokens supported by this model (e.g. 128000).',
   'Failed to search redemption codes',
   'Failed to create redemption code',
   'Failed to update redemption code',

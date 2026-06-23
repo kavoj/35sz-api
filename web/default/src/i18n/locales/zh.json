@@ -4639,6 +4639,8 @@
     "Video generation/understanding endpoints.": "视频生成/理解端点。",
     "Text embedding endpoint.": "文本向量端点。",
     "Code-focused models via chat endpoints.": "面向代码的模型，通过 chat 端点调用。",
-    "Reasoning models via chat endpoints.": "推理模型，通过 chat 端点调用。"
+    "Reasoning models via chat endpoints.": "推理模型，通过 chat 端点调用。",
+    "Context window": "上下文窗口",
+    "Maximum context tokens supported by this model (e.g. 128000).": "该模型支持的最大上下文 token 数（如 128000）。"
   }
 }

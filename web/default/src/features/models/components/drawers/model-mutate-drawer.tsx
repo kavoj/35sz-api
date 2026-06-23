@@ -108,6 +108,7 @@ const extendedModelFormSchema = z.object({
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
+  context_length: z.number().optional(),
   price: z.string().optional(),
   ratio: z.string().optional(),
   cacheRatio: z.string().optional(),
@@ -239,6 +240,7 @@ export function ModelMutateDrawer({
       name_rule: 0,
       status: true,
       sync_official: true,
+      context_length: undefined,
       price: '',
       ratio: '',
       cacheRatio: '',
@@ -414,6 +416,7 @@ export function ModelMutateDrawer({
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
+        context_length: model.context_length,
         price: '',
         ratio: '',
         cacheRatio: '',
@@ -518,6 +521,7 @@ export function ModelMutateDrawer({
         name_rule: 0,
         status: true,
         sync_official: true,
+        context_length: undefined,
         price: '',
         ratio: '',
         cacheRatio: '',
@@ -1005,6 +1009,31 @@ export function ModelMutateDrawer({
                     </div>
                     <FormDescription className="mt-2">
                       {t('Press Enter or comma to add tags, or click tags below to add')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="context_length"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Context window')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="128000"
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          field.onChange(v === '' ? undefined : Number(v))
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Maximum context tokens supported by this model (e.g. 128000).')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
