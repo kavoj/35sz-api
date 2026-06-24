@@ -4644,6 +4644,9 @@
     "Maximum context tokens supported by this model (e.g. 128000).": "该模型支持的最大上下文 token 数（如 128000）。",
     "One gateway to access global AI models.": "一处接入全球 AI 模型。",
     "Vendors": "厂商",
-    "Service availability": "服务可用性"
+    "Service availability": "服务可用性",
+    "Wallet top-up notify URL": "钱包充值回调地址",
+    "Subscription notify URL": "订阅购买回调地址",
+    "Notify URLs are generated automatically and sent with each Native order. No callback configuration is required on the WeChat merchant platform. The base follows the callback address above, or the server address when it is blank.": "回调地址在每次 Native 下单时自动生成并随订单发送，无需在微信商户平台配置回调。其域名取自上方的回调地址；留空时使用系统服务器地址。"
   }
 }

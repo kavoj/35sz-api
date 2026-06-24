@@ -169,6 +169,11 @@ export const STATIC_I18N_KEYS = [
   'Maximum context tokens supported by this model (e.g. 128000).',
   'Context',
 
+  // WeChat Pay notify URLs
+  'Wallet top-up notify URL',
+  'Subscription notify URL',
+  'Notify URLs are generated automatically and sent with each Native order. No callback configuration is required on the WeChat merchant platform. The base follows the callback address above, or the server address when it is blank.',
+
   // Pricing capability tabs & hero
   'Text',
   'Code',
