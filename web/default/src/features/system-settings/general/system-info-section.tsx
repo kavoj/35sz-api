@@ -82,122 +82,6 @@ function normalizeValue(value: unknown): string {
   return typeof value === 'string' ? value : String(value)
 }
 
-interface LogoUploadFieldProps {
-  label: string
-  value?: string
-  onChange: (value: string) => void
-}
-
-function LogoUploadField({ label, value, onChange }: LogoUploadFieldProps) {
-  const { t } = useTranslation()
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Validate file type
-    if (file.type !== 'image/png') {
-      toast.error(t('Only PNG files are allowed'))
-      event.target.value = ''
-      return
-    }
-
-    // Validate file size (max 100KB)
-    const maxSize = 100 * 1024
-    if (file.size > maxSize) {
-      toast.error(t('File size must be 100KB or smaller'))
-      event.target.value = ''
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (loadEvent) => {
-      const dataUrl = loadEvent.target?.result as string
-
-      // Validate image dimensions
-      const img = new Image()
-      img.onload = () => {
-        const maxWidth = 128
-        const maxHeight = 128
-
-        if (img.width > maxWidth || img.height > maxHeight) {
-          toast.error(
-            t('Image dimensions must be {{width}}x{{height}} or smaller', {
-              width: maxWidth,
-              height: maxHeight,
-            })
-          )
-          event.target.value = ''
-          return
-        }
-
-        onChange(dataUrl)
-        toast.success(t('Logo uploaded successfully'))
-      }
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(file)
-    event.target.value = ''
-  }
-
-  return (
-    <div className='space-y-3'>
-      <FormLabel>{label}</FormLabel>
-      <div className='flex flex-wrap items-center gap-4'>
-        {value ? (
-          <div className='bg-muted flex h-16 w-16 items-center justify-center rounded-lg border p-2'>
-            <img
-              src={value}
-              alt={t('Logo preview')}
-              className='h-full w-full object-contain'
-            />
-          </div>
-        ) : (
-          <div className='bg-muted text-muted-foreground flex h-16 w-16 flex-col items-center justify-center rounded-lg border text-xs'>
-            <Upload className='mb-1 h-5 w-5' />
-            {t('No logo')}
-          </div>
-        )}
-        <div className='flex gap-2'>
-          <input
-            ref={fileInputRef}
-            type='file'
-            accept='image/png'
-            className='hidden'
-            onChange={handleFileChange}
-          />
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className='mr-2 h-4 w-4' />
-            {t('Upload Logo')}
-          </Button>
-          {value ? (
-            <Button
-              type='button'
-              variant='outline'
-              size='sm'
-              onClick={() => onChange('')}
-            >
-              <X className='mr-2 h-4 w-4' />
-              {t('Clear')}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      <FormDescription>
-        {t(
-          'Upload a PNG image (max 128×128 pixels, 100KB). Alternatively, enter a URL below.'
-        )}
-      </FormDescription>
-    </div>
-  )
-}
-
 export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -359,29 +243,155 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
               <FormField
                 control={form.control}
                 name='Logo'
-                render={({ field }) => (
-                  <FormItem>
-                    <LogoUploadField
-                      label={t('Logo')}
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                    <FormControl>
-                      <Input
-                        placeholder={t('Or enter a URL: https://example.com/logo.png')}
-                        className='mt-2'
-                        value={field.value?.startsWith('data:') ? '' : field.value || ''}
-                        onChange={(e) => {
-                          // Only update if not a data URL (user is typing URL)
-                          if (!e.target.value.startsWith('data:')) {
-                            field.onChange(e.target.value)
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  // Get showUrlInput state from LogoUploadField
+                  // We'll use form state or a separate state manager
+                  const [showUrlInput, setShowUrlInput] = React.useState(false)
+                  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+                  const { t } = useTranslation()
+
+                  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+
+                    if (file.type !== 'image/png') {
+                      toast.error(t('Only PNG files are allowed'))
+                      event.target.value = ''
+                      return
+                    }
+
+                    const maxSize = 100 * 1024
+                    if (file.size > maxSize) {
+                      toast.error(t('File size must be 100KB or smaller'))
+                      event.target.value = ''
+                      return
+                    }
+
+                    const reader = new FileReader()
+                    reader.onload = (loadEvent) => {
+                      const dataUrl = loadEvent.target?.result as string
+                      const img = new Image()
+                      img.onload = () => {
+                        if (img.width > 128 || img.height > 128) {
+                          toast.error(
+                            t('Image dimensions must be {{width}}x{{height}} or smaller', {
+                              width: 128,
+                              height: 128,
+                            })
+                          )
+                          event.target.value = ''
+                          return
+                        }
+                        field.onChange(dataUrl)
+                        toast.success(t('Logo uploaded successfully'))
+                      }
+                      img.src = dataUrl
+                    }
+                    reader.readAsDataURL(file)
+                    event.target.value = ''
+                  }
+
+                  return (
+                    <FormItem>
+                      <FormLabel>{t('Logo')}</FormLabel>
+                      <div className='flex flex-wrap items-center gap-4'>
+                        <input
+                          ref={fileInputRef}
+                          type='file'
+                          accept='image/png'
+                          className='hidden'
+                          onChange={handleFileChange}
+                        />
+                        {field.value ? (
+                          <button
+                            type='button'
+                            onClick={() => fileInputRef.current?.click()}
+                            className='bg-muted hover:bg-accent flex h-16 w-16 items-center justify-center rounded-lg border p-2 transition-colors'
+                          >
+                            <img
+                              src={field.value}
+                              alt={t('Logo preview')}
+                              className='h-full w-full object-contain'
+                            />
+                          </button>
+                        ) : (
+                          <button
+                            type='button'
+                            onClick={() => fileInputRef.current?.click()}
+                            className='bg-muted text-muted-foreground hover:bg-accent flex h-16 w-16 flex-col items-center justify-center rounded-lg border text-xs transition-colors'
+                          >
+                            <Upload className='mb-1 h-5 w-5' />
+                            {t('Click to upload')}
+                          </button>
+                        )}
+                        <div className='flex gap-2'>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <Upload className='mr-2 h-4 w-4' />
+                            {t('Upload Logo')}
+                          </Button>
+                          {!showUrlInput && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() => setShowUrlInput(true)}
+                            >
+                              {t('Enter URL')}
+                            </Button>
+                          )}
+                          {field.value ? (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() => field.onChange('')}
+                            >
+                              <X className='mr-2 h-4 w-4' />
+                              {t('Clear')}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <FormDescription>
+                        {t(
+                          'Upload a PNG image (max 128×128 pixels, 100KB). Alternatively, enter a URL.'
+                        )}
+                        {' '}
+                        {t('支持 PNG 格式图片（最大 128×128 像素，100KB），或输入图片 URL。')}
+                      </FormDescription>
+                      {showUrlInput && (
+                        <FormControl>
+                          <div className='relative mt-2'>
+                            <Input
+                              placeholder={t('https://example.com/logo.png')}
+                              value={field.value?.startsWith('data:') ? '' : field.value || ''}
+                              onChange={(e) => {
+                                if (!e.target.value.startsWith('data:')) {
+                                  field.onChange(e.target.value)
+                                }
+                              }}
+                            />
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='sm'
+                              className='absolute right-1 top-1/2 h-7 -translate-y-1/2'
+                              onClick={() => setShowUrlInput(false)}
+                            >
+                              <X className='h-4 w-4' />
+                            </Button>
+                          </div>
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
               />
 
               <FormField
