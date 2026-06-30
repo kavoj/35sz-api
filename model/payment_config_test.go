@@ -11,11 +11,11 @@ import (
 func withPaymentConfigTestDB(t *testing.T) {
 	t.Helper()
 	oldDB := DB
-	oldSQLite := common.UsingSQLite
-	common.UsingSQLite = true
+	oldDBType := common.MainDatabaseType()
+	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	t.Cleanup(func() {
 		DB = oldDB
-		common.UsingSQLite = oldSQLite
+		common.SetMainDatabaseType(oldDBType)
 	})
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

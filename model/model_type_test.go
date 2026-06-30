@@ -11,12 +11,12 @@ import (
 func setupModelTypeTestDB(t *testing.T) {
 	t.Helper()
 	oldDB := DB
-	oldSQLite := common.UsingSQLite
+	oldDBType := common.MainDatabaseType()
 	DB = nil
-	common.UsingSQLite = true
+	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	t.Cleanup(func() {
 		DB = oldDB
-		common.UsingSQLite = oldSQLite
+		common.SetMainDatabaseType(oldDBType)
 	})
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
