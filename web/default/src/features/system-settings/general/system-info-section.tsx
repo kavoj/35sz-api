@@ -358,15 +358,6 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                           </button>
                         )}
                         <div className='flex gap-2'>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            <Upload className='mr-2 h-4 w-4' />
-                            {t('Upload Logo')}
-                          </Button>
                           {!showUrlInput && (
                             <Button
                               type='button'
@@ -394,8 +385,6 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                         {t(
                           'Upload a PNG image (max 128×128 pixels, 100KB). Alternatively, enter a URL.'
                         )}
-                        {' '}
-                        {t('支持 PNG 格式图片（最大 128×128 像素，100KB），或输入图片 URL。')}
                       </FormDescription>
                       {showUrlInput && (
                         <FormControl>
