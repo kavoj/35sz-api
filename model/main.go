@@ -305,6 +305,7 @@ func migrateDB() error {
 		&CasbinRule{},
 		&AuthzRole{},
 		&CommissionRule{},
+		&UserReferralPath{},
 	)
 	if err != nil {
 		return err
