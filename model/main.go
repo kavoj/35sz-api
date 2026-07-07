@@ -307,6 +307,7 @@ func migrateDB() error {
 		&CommissionRule{},
 		&UserReferralPath{},
 		&UserCommissionStats{},
+		&CommissionRecord{},
 	)
 	if err != nil {
 		return err
