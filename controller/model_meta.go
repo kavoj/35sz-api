@@ -340,3 +340,87 @@ func enrichModels(models []*model.Model) {
 		mm.MatchedCount = len(names)
 	}
 }
+
+// SyncModelVendors 批量为模型补齐/刷新供应商 (vendor_id)。
+// 策略：
+//  1. 先按 constant.ChannelTypeToVendor 幂等种子化 vendors 表，保证映射目标存在。
+//  2. 遍历全部模型，按 icon → 名称模式的顺序推断 vendor.Name，写入 vendor_id。
+//  3. 未推断到 vendor 的模型保留原值（不清空），计入 unmatched。
+//  4. 与现值相同的记录不写库，计入 unchanged；避免无意义 UPDATE。
+//
+// 权限：AdminAuth 保护（路由层）。
+func SyncModelVendors(c *gin.Context) {
+	// 1) 种子化 vendors
+	seedCreated := 0
+	seenNames := make(map[string]struct{})
+	for _, spec := range constant.ChannelTypeToVendor {
+		if _, ok := seenNames[spec.Name]; ok {
+			continue
+		}
+		seenNames[spec.Name] = struct{}{}
+		existed, err := model.UpsertVendorByName(spec.Name, spec.DisplayName, spec.Icon)
+		if err != nil {
+			common.SysError("SyncModelVendors upsert vendor " + spec.Name + ": " + err.Error())
+			continue
+		}
+		if !existed {
+			seedCreated++
+		}
+	}
+
+	// 2) 拉取全部 vendors，建立 name -> id 映射
+	vendors, err := model.GetAllVendorsForSync()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	nameToID := make(map[string]int, len(vendors))
+	for _, v := range vendors {
+		nameToID[v.Name] = v.Id
+	}
+
+	// 3) 拉取全部模型（不分页；模型数在系统里通常是几十到几百量级）
+	var allModels []*model.Model
+	if err := model.DB.Find(&allModels).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	updated, unchanged, unmatched := 0, 0, 0
+	for _, m := range allModels {
+		targetVendorName := ""
+		// 3a) 图标反查
+		if spec, ok := constant.LookupVendorByIcon(m.Icon); ok {
+			targetVendorName = spec.Name
+		}
+		// 3b) 名称模式反查
+		if targetVendorName == "" {
+			targetVendorName = constant.InferVendorNameByModelName(m.ModelName)
+		}
+		if targetVendorName == "" {
+			unmatched++
+			continue
+		}
+		vid, ok := nameToID[targetVendorName]
+		if !ok || vid == 0 {
+			unmatched++
+			continue
+		}
+		if m.VendorID == vid {
+			unchanged++
+			continue
+		}
+		if err := model.DB.Model(&model.Model{}).Where("id = ?", m.Id).Update("vendor_id", vid).Error; err != nil {
+			common.SysError("SyncModelVendors update model " + m.ModelName + ": " + err.Error())
+			continue
+		}
+		updated++
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"updated":         updated,
+		"unchanged":       unchanged,
+		"unmatched":       unmatched,
+		"vendors_created": seedCreated,
+	})
+}

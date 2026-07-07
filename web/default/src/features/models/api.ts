@@ -194,6 +194,29 @@ export async function syncUpstream(params?: {
 }
 
 /**
+ * Response shape for POST /api/models/sync_vendors
+ */
+export interface SyncVendorsResponse {
+  success: boolean
+  message: string
+  data?: {
+    updated: number
+    unchanged: number
+    unmatched: number
+    vendors_created: number
+  }
+}
+
+/**
+ * Batch-fill vendor_id for every model by icon → name-pattern inference.
+ * Also seeds the vendors table when empty. Admin only.
+ */
+export async function syncModelVendors(): Promise<SyncVendorsResponse> {
+  const res = await api.post('/api/models/sync_vendors')
+  return res.data
+}
+
+/**
  * Preview upstream diff
  */
 export async function previewUpstreamDiff(params?: {

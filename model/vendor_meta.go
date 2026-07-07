@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+
 	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
@@ -51,6 +53,56 @@ func (v *Vendor) Update() error {
 // Delete 软删除供应商
 func (v *Vendor) Delete() error {
 	return DB.Delete(v).Error
+}
+
+// GetVendorByName 根据 Name 查找供应商（用于幂等 upsert）
+func GetVendorByName(name string) (*Vendor, error) {
+	if name == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var v Vendor
+	err := DB.Where("name = ?", name).First(&v).Error
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+// UpsertVendorByName 幂等地按 Name 创建供应商。
+// 已存在则不覆盖 DisplayName/Icon（保留管理员的手工修改）。
+// 返回 (existed, error)：existed=true 表示记录已存在跳过写库。
+func UpsertVendorByName(name, displayName, icon string) (bool, error) {
+	if name == "" {
+		return false, nil
+	}
+	existing, err := GetVendorByName(name)
+	if err == nil && existing != nil {
+		return true, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
+	v := &Vendor{
+		Name:        name,
+		DisplayName: displayName,
+		Icon:        icon,
+		Status:      1,
+	}
+	if err := v.Insert(); err != nil {
+		// 并发下如果被另一个请求先插了，也当作成功
+		if existing2, e2 := GetVendorByName(name); e2 == nil && existing2 != nil {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// GetAllVendorsForSync 拉取全部供应商（不分页，供 sync 使用）
+func GetAllVendorsForSync() ([]*Vendor, error) {
+	var vendors []*Vendor
+	err := DB.Find(&vendors).Error
+	return vendors, err
 }
 
 // GetVendorByID 根据 ID 获取供应商

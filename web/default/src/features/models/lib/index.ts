@@ -28,3 +28,6 @@ export * from './model-form'
 // Actions
 export * from './model-actions'
 export * from './vendor-actions'
+
+// Vendor inference (icon / model-name → vendor.name)
+export * from './vendor-inference'

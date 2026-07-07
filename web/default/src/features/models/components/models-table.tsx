@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import {
   getCoreRowModel,
@@ -25,11 +25,14 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table'
+import { RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 import { useMediaQuery } from '@/hooks'
 import { useTranslation } from 'react-i18next'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { Button } from '@/components/ui/button'
 import { DataTablePage } from '@/components/data-table'
-import { getModels, searchModels, getVendors } from '../api'
+import { getModels, searchModels, getVendors, syncModelVendors } from '../api'
 import {
   DEFAULT_PAGE_SIZE,
   getModelStatusOptions,
@@ -46,6 +49,33 @@ export function ModelsTable() {
   const { t } = useTranslation()
   const { selectedVendor } = useModels()
   const isMobile = useMediaQuery('(max-width: 640px)')
+  const queryClient = useQueryClient()
+
+  // 一键同步供应商：调用 POST /api/models/sync_vendors
+  // 后端按 icon → 模型名 → vendor 规则批量回填 vendor_id；
+  // 结束后刷新模型列表 + vendor 列表，让 UI 立刻反映最新供应商归属。
+  const syncVendorsMutation = useMutation({
+    mutationFn: syncModelVendors,
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.message || t('Failed to sync vendors'))
+        return
+      }
+      const data = res.data ?? { updated: 0, unchanged: 0, unmatched: 0, vendors_created: 0 }
+      toast.success(
+        t('Synced {{updated}} updated / {{unchanged}} unchanged / {{unmatched}} unmatched', {
+          updated: data.updated,
+          unchanged: data.unchanged,
+          unmatched: data.unmatched,
+        })
+      )
+      queryClient.invalidateQueries({ queryKey: modelsQueryKeys.all })
+      queryClient.invalidateQueries({ queryKey: vendorsQueryKeys.all })
+    },
+    onError: () => {
+      toast.error(t('Failed to sync vendors'))
+    },
+  })
 
   // Table state
   const [sorting, setSorting] = useState<SortingState>([])
@@ -258,6 +288,24 @@ export function ModelsTable() {
       applyHeaderSize
       toolbarProps={{
         searchPlaceholder: t('Filter by model name...'),
+        preActions: (
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => syncVendorsMutation.mutate()}
+            disabled={syncVendorsMutation.isPending}
+            aria-label={t('Sync vendors from icons and model names')}
+          >
+            <RefreshCw
+              className={
+                syncVendorsMutation.isPending
+                  ? 'mr-2 h-4 w-4 animate-spin'
+                  : 'mr-2 h-4 w-4'
+              }
+            />
+            {t('Sync Vendors')}
+          </Button>
+        ),
         filters: [
           {
             columnId: 'status',

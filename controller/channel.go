@@ -38,6 +38,21 @@ func syncChannelModelMetadata(channel *model.Channel) {
 			modelType = model.NormalizeModelType(raw)
 		}
 	}
+
+	// 1) 按 channel type 幂等 upsert 供应商。渠道类型足以确定其所服务模型的原始供应商。
+	// 失败仅日志，不阻断后续流程。
+	var vendorID int
+	var vendorIcon string
+	if spec, ok := constant.LookupVendorByChannelType(channel.Type); ok {
+		if _, err := model.UpsertVendorByName(spec.Name, spec.DisplayName, spec.Icon); err != nil {
+			common.SysError(fmt.Sprintf("upsert vendor %s failed: %s", spec.Name, err.Error()))
+		}
+		if v, err := model.GetVendorByName(spec.Name); err == nil && v != nil {
+			vendorID = v.Id
+			vendorIcon = v.Icon
+		}
+	}
+
 	for _, modelName := range strings.Split(channel.Models, ",") {
 		modelName = strings.TrimSpace(modelName)
 		if modelName == "" {
@@ -46,10 +61,23 @@ func syncChannelModelMetadata(channel *model.Channel) {
 		var existing model.Model
 		if err := model.DB.Where("model_name = ?", modelName).First(&existing).Error; err == nil {
 			existing.ModelType = modelType
+			// 已存在的模型：仅当此前无 vendor_id 时补齐；不覆盖管理员手工设置。
+			if existing.VendorID == 0 && vendorID != 0 {
+				existing.VendorID = vendorID
+			}
+			if existing.Icon == "" && vendorIcon != "" {
+				existing.Icon = vendorIcon
+			}
 			_ = existing.Update()
 			continue
 		}
-		_ = (&model.Model{ModelName: modelName, ModelType: modelType, Status: 1}).Insert()
+		_ = (&model.Model{
+			ModelName: modelName,
+			ModelType: modelType,
+			VendorID:  vendorID,
+			Icon:      vendorIcon,
+			Status:    1,
+		}).Insert()
 	}
 }
 

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -86,6 +86,7 @@ import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
 import { createModel, updateModel, getModel, getVendors, getModels } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES, TAG_PRESETS, getTagLabel, getTagCategoryLabel, CAPABILITY_ENDPOINT_HINTS } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
+import { inferVendorName } from '../../lib/vendor-inference'
 import {
   getCompletionPriceLabelKey,
   getFixedPriceLabelKey,
@@ -251,72 +252,49 @@ export function ModelMutateDrawer({
     },
   })
 
-  // Smart vendor recommendation based on model name
-  const recommendedVendorId = useMemo(() => {
-    const modelName = form.getValues('model_name')
-    if (!modelName || vendors.length === 0) return undefined
+  // 自动匹配的 vendor ID：图标优先，然后按模型名称推断。
+  // 与后端 constant.LookupVendorByIcon / InferVendorNameByModelName 保持一致。
+  const iconValue = form.watch('icon')
+  const modelNameValue = form.watch('model_name')
+  const autoMatchedVendorId = useMemo(() => {
+    if (vendors.length === 0) return undefined
+    const inferredName = inferVendorName({
+      icon: iconValue,
+      modelName: modelNameValue,
+    })
+    if (!inferredName) return undefined
+    const match = vendors.find(
+      (v) => v.name.toLowerCase() === inferredName.toLowerCase()
+    )
+    return match?.id
+  }, [iconValue, modelNameValue, vendors])
 
-    // Calculate vendor usage statistics
-    const vendorUsage: Record<number, number> = {}
-    for (const model of allModels) {
-      if (model.vendor_id) {
-        vendorUsage[model.vendor_id] = (vendorUsage[model.vendor_id] || 0) + 1
-      }
+  // 当图标或模型名变化导致自动匹配结果变化时，自动写入 vendor_id。
+  // 用户仍可通过下拉框手动改回；只在自动匹配结果切换时更新，避免抹掉手动选择。
+  const lastAutoMatchRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (!open) return
+    const current = form.getValues('vendor_id')
+    // 首次进入编辑：只有当模型此前没有 vendor 或已知匹配一致时才自动填
+    if (autoMatchedVendorId === undefined) {
+      lastAutoMatchRef.current = undefined
+      return
     }
-
-    // Smart pattern matching
-    const modelNameLower = modelName.toLowerCase()
-
-    // Check each vendor for matching patterns
-    for (const vendor of vendors) {
-      const vendorNameLower = vendor.name.toLowerCase()
-
-      // Exact match or prefix match
-      if (modelNameLower.includes(vendorNameLower) ||
-          vendorNameLower.includes(modelNameLower.split(/[-@/]/)[0])) {
-        return vendor.id
-      }
-
-      // Common pattern matching
-      const patterns: Record<string, string[]> = {
-        'OpenAI': ['gpt', 'dall-e', 'text-davinci', 'text-curie', 'text-babbage', 'text-ada'],
-        'Anthropic': ['claude'],
-        'Google': ['gemini', 'gemma', 'palm', 'text-bison', 'chat-bison'],
-        'DeepSeek': ['deepseek'],
-        'Zhipu': ['glm', 'zhipu'],
-        'Moonshot': ['moonshot', 'kimi'],
-        'Qwen': ['qwen'],
-        'ByteDance': ['doubao', 'seed'],
-        'Alibaba': ['qwen'],
-        'Tencent': ['hunyuan'],
-        'Baichuan': ['baichuan'],
-        'Meta': ['llama'],
-        'Mistral': ['mistral', 'mixtral'],
-      }
-
-      for (const [vendorPattern, keywords] of Object.entries(patterns)) {
-        if (vendorNameLower.includes(vendorPattern.toLowerCase())) {
-          for (const keyword of keywords) {
-            if (modelNameLower.includes(keyword.toLowerCase())) {
-              return vendor.id
-            }
-          }
-        }
-      }
+    // 首次自动填：当前无值 → 填入
+    if (!current) {
+      form.setValue('vendor_id', autoMatchedVendorId, { shouldDirty: true })
+      lastAutoMatchRef.current = autoMatchedVendorId
+      return
     }
-
-    // Fallback to most used vendor
-    let maxCount = 0
-    let mostUsedVendorId: number | undefined
-    for (const [vendorId, count] of Object.entries(vendorUsage)) {
-      if (count > maxCount) {
-        maxCount = count
-        mostUsedVendorId = parseInt(vendorId)
-      }
+    // 自动匹配结果变化（如换了图标）且当前值等于上一次自动匹配值 → 跟随更新
+    if (
+      current === lastAutoMatchRef.current &&
+      lastAutoMatchRef.current !== autoMatchedVendorId
+    ) {
+      form.setValue('vendor_id', autoMatchedVendorId, { shouldDirty: true })
+      lastAutoMatchRef.current = autoMatchedVendorId
     }
-
-    return mostUsedVendorId
-  }, [form.watch('model_name'), vendors, allModels])
+  }, [autoMatchedVendorId, open, form])
 
   // Sort vendors by usage and display name
   const sortedVendors = useMemo(() => {
@@ -532,13 +510,6 @@ export function ModelMutateDrawer({
       })
     }
   }, [open, isEditing, modelData, currentRow, form, modelSettings])
-
-  // Auto-apply recommended vendor when model name changes (for new models)
-  useEffect(() => {
-    if (!isEditing && recommendedVendorId && !form.getValues('vendor_id')) {
-      form.setValue('vendor_id', recommendedVendorId)
-    }
-  }, [recommendedVendorId, isEditing, form])
 
   const onSubmit = useCallback(
     async (values: ExtendedModelFormValues): Promise<void> => {
@@ -880,11 +851,12 @@ export function ModelMutateDrawer({
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       {t('Vendor')}
-                      {recommendedVendorId && !field.value && (
-                        <span className="text-xs text-primary font-medium">
-                          {t('Recommended')}
-                        </span>
-                      )}
+                      {autoMatchedVendorId &&
+                        field.value === autoMatchedVendorId && (
+                          <span className="text-xs text-primary font-medium">
+                            {t('Auto-matched')}
+                          </span>
+                        )}
                     </FormLabel>
                     <Select
                       items={[
@@ -900,14 +872,33 @@ export function ModelMutateDrawer({
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={t('Select vendor')} />
+                          <SelectValue placeholder={t('Select vendor')}>
+                            {(() => {
+                              const selected = sortedVendors.find(
+                                (v) => v.id === field.value
+                              )
+                              if (!selected) return null
+                              return (
+                                <span className='flex items-center gap-2'>
+                                  {selected.icon && (
+                                    <span className='flex items-center'>
+                                      {getLobeIcon(selected.icon, 14)}
+                                    </span>
+                                  )}
+                                  <span>
+                                    {selected.display_name || selected.name}
+                                  </span>
+                                </span>
+                              )
+                            })()}
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent alignItemWithTrigger={false}>
                         <SelectGroup>
                           {sortedVendors.map((vendor) => {
                             const isRecommended =
-                              !field.value && vendor.id === recommendedVendorId
+                              !field.value && vendor.id === autoMatchedVendorId
                             const modelCount = allModels.filter(
                               (model) => model.vendor_id === vendor.id
                             ).length
