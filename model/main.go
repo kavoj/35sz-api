@@ -306,6 +306,7 @@ func migrateDB() error {
 		&AuthzRole{},
 		&CommissionRule{},
 		&UserReferralPath{},
+		&UserCommissionStats{},
 	)
 	if err != nil {
 		return err
