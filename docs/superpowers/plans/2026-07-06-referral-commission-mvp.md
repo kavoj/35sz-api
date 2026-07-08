@@ -3339,3 +3339,46 @@ git commit -m "docs(commission): finalize plan retro + update feature catalog"
 - `cd web/default && bun run typecheck && bun run build` 通过
 - SQLite / MySQL / PostgreSQL 三库手动冒烟通过
 - 生产灰度开关：初始 `commission_rules.enabled=true`；如需暂停 SQL `UPDATE commission_rules SET enabled=false` 即可，不影响支付主链路
+
+---
+
+## 执行摘要（2026-07-08 完成）
+
+**24 个任务全部完成。** 后端 16 个 + 前端 6 个 + i18n 1 个 + 文档 1 个。
+
+### 关键路径回顾
+
+- **数据模型（T1–T5）** — 5 张表 + AutoMigrate 注册 + 通用测试 helper `SetupTestDBForCommissionTests`。
+- **Service 层（T6–T11）** — path/record/settle/redeem/void/seed 六个模块，每个都有 5–10 个 TDD 测试。首充判定用 `COUNT(topups)` 事实数据，无需额外字段。
+- **调度器（T12）** — 通过 `service/system_task_commission.go` 桥接文件避免 import cycle。
+- **注册钩子 & 支付埋点（T13–T14）** — 4 处埋入：Register、Alipay、Wechat、Epay 回调。全部 `go` 关键字异步 + `recover()` 兜底。
+- **HTTP 层（T15–T16）** — 10 个 handler + 6 selfRoute + 6 commissionAdmin。PII 脱敏用 `maskUsername` / `maskEmail` helper。
+- **前端（T17–T21）** — 2 feature 模块，用户端 `/referral` + 管理端 `/system-settings/commission`。二维码用 `qrcode.react`。
+- **i18n（T22）** — 44 组 zh + en 键。
+- **回归（T23）** — `go test ./...` 全绿；`bun run build` 通过。三库 E2E（MySQL/Postgres）留给运维环境验证。
+
+### 已知遗留 / 待办（二期）
+
+- 订阅分佣（`scope='subscription'`）
+- 消费分佣（按 API 用量返佣）
+- 三级及以上分销
+- 微信企业付款 API 提现（当前只转余额）
+- 反作弊规则引擎（同 IP、设备指纹、首单窗口）
+- 分销员等级 / 阶梯佣金
+- 财务对账导出、KYC 实名
+- 三库真实生产环境 E2E 冒烟（本次仅完成 SQLite 单元测试）
+
+### 灰度建议
+
+上线首日建议：
+1. 保留 `commission_rules.enabled=true`（默认状态）；
+2. 观察 24h 内 `commission_records` 表增长与 `logs.LogTypeSystem` 结算日志；
+3. 若发现异常可 SQL `UPDATE commission_rules SET enabled=false` 立即停止分佣，不影响支付主链路；
+4. 首个 T+7 结算窗口后确认 `pending → settled` 流程正常。
+
+### 已通过验证
+
+- `go build ./...` — 无编译错误
+- `go test ./...` — 40+ 单元测试全部通过（含 model、service/commission、controller 层）
+- `bun run build` — 前端 dist 产出成功
+- 数据库兼容 — SQLite AutoMigrate 通过（MySQL/Postgres 生产环境冒烟待运维验证）
