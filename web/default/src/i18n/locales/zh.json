@@ -5164,6 +5164,18 @@
     "Voided": "已作废",
     "settled": "已结算",
     "voided": "已作废",
-    "quota": "额度"
+    "quota": "额度",
+    "Calculated ratio: {{ratio}} (stored as base USD)": "计算后的倍率：{{ratio}}（按基础 USD 存储）",
+    "Enter input price in {{currency}}; stored as base USD after conversion.": "按 {{currency}} 输入输入价格；系统会换算为基础 USD 后存储。",
+    "Enter completion price in {{currency}}; stored as base USD after conversion.": "按 {{currency}} 输入输出价格；系统会换算为基础 USD 后存储。",
+    "Enter price in {{currency}} per request; stored as base USD after conversion.": "按 {{currency}}/请求 输入价格；系统会换算为基础 USD 后存储。",
+    "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.": "批量元信息同步时包含此模型（描述/图标/标签/供应商）。定价在上方独立管理。",
+    "Official reference price": "官方参考价",
+    "No official price available for this model.": "未找到此模型的官方参考价，请手动填写。",
+    "Apply official price": "一键填入官方价",
+    "Loading official price...": "正在加载官方参考价…",
+    "Source: {{source}}": "数据来源：{{source}}",
+    "Overwrite existing values?": "覆盖已有的定价值？",
+    "Some pricing fields already have values that differ from the official price. Applying will overwrite them.": "当前有部分定价字段与官方参考价不同，一键填入将覆盖这些值。"
   }
 }

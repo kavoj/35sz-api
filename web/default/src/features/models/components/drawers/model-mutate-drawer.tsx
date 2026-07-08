@@ -25,7 +25,11 @@ import { ChevronDown, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSystemConfig } from '@/hooks/use-system-config'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+import {
+  convertBillingDisplayToUSD,
+  convertUSDToBillingDisplay,
+  formatBillingCurrencyFromUSD,
+} from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -96,6 +100,7 @@ import {
 } from '../../lib/pricing-currency-label'
 import type { Model } from '../../types'
 import { IconSelector } from '@/components/icon-selector'
+import { OfficialPricingReference } from '../pricing/official-pricing-reference'
 
 // Extended schema for ratio configuration (internal form state only)
 const extendedModelFormSchema = z.object({
@@ -353,7 +358,11 @@ export function ModelMutateDrawer({
   const handlePromptPriceChange = (value: string) => {
     setPromptPrice(value)
     if (value && !isNaN(parseFloat(value))) {
-      const ratio = parseFloat(value) / 2
+      // Input arrives in the currently displayed currency; convert to base USD
+      // before deriving the ratio so `ModelRatio` stays USD-anchored, matching
+      // commission redeem (service/commission/redeem.go) and topup accounting.
+      const usdPrice = convertBillingDisplayToUSD(parseFloat(value))
+      const ratio = usdPrice / 2
       form.setValue('ratio', ratio.toString())
     } else {
       form.setValue('ratio', '')
@@ -369,12 +378,81 @@ export function ModelMutateDrawer({
       !isNaN(parseFloat(promptPrice)) &&
       parseFloat(promptPrice) > 0
     ) {
+      // completion / prompt is a dimensionless ratio — currency-independent.
       const completionRatio = parseFloat(value) / parseFloat(promptPrice)
       form.setValue('completionRatio', completionRatio.toString())
     } else {
       form.setValue('completionRatio', '')
     }
   }
+
+  /**
+   * Apply official reference-price values into the form. Payload fields are
+   * USD-anchored ratios (or a USD per-request price); the form stores them
+   * verbatim, and the display-currency mirror state gets refreshed so the
+   * price-mode inputs update alongside.
+   */
+  const applyOfficialPricing = useCallback(
+    (payload: {
+      ratio?: number
+      completionRatio?: number
+      cacheRatio?: number
+      imageRatio?: number
+      audioRatio?: number
+      audioCompletionRatio?: number
+      modelPrice?: number
+    }) => {
+      if (payload.modelPrice !== undefined) {
+        // Per-request: show the value in the current display currency,
+        // mirroring what a manual entry would look like.
+        const displayPrice = convertUSDToBillingDisplay(payload.modelPrice)
+        form.setValue('price', displayPrice.toString())
+        return
+      }
+      if (payload.ratio !== undefined) {
+        form.setValue('ratio', payload.ratio.toString())
+        const inputPriceDisplay = convertUSDToBillingDisplay(
+          payload.ratio * 2
+        )
+        setPromptPrice(inputPriceDisplay.toString())
+        if (payload.completionRatio !== undefined) {
+          form.setValue(
+            'completionRatio',
+            payload.completionRatio.toString()
+          )
+          setCompletionPrice(
+            (inputPriceDisplay * payload.completionRatio).toString()
+          )
+        } else {
+          form.setValue('completionRatio', '')
+          setCompletionPrice('')
+        }
+      }
+      const setOrClear = (
+        name:
+          | 'cacheRatio'
+          | 'imageRatio'
+          | 'audioRatio'
+          | 'audioCompletionRatio',
+        val: number | undefined
+      ) => {
+        form.setValue(name, val !== undefined ? val.toString() : '')
+      }
+      setOrClear('cacheRatio', payload.cacheRatio)
+      setOrClear('imageRatio', payload.imageRatio)
+      setOrClear('audioRatio', payload.audioRatio)
+      setOrClear('audioCompletionRatio', payload.audioCompletionRatio)
+      if (
+        payload.cacheRatio !== undefined ||
+        payload.imageRatio !== undefined ||
+        payload.audioRatio !== undefined ||
+        payload.audioCompletionRatio !== undefined
+      ) {
+        setAdvancedOpen(true)
+      }
+    },
+    [form]
+  )
 
   // Load model data for editing and ratio configuration
   useEffect(() => {
@@ -448,18 +526,25 @@ export function ModelMutateDrawer({
         // Determine pricing mode
         if (price !== undefined && price !== null) {
           setPricingMode('per-request')
+          // `price` in DB is base USD/request. When admin views in CNY/CUSTOM,
+          // prefill the input with the display-currency equivalent so the
+          // number they see matches what they'd type in.
+          const displayPrice = convertUSDToBillingDisplay(price)
           form.reset({
             ...baseModelData,
-            price: price.toString(),
+            price: displayPrice.toString(),
           })
         } else {
           setPricingMode('per-token')
           if (ratio !== undefined && ratio !== null) {
-            const tokenPrice = ratio * 2
-            setPromptPrice(tokenPrice.toString())
+            // ratio is USD-anchored (1 unit = $2 / 1M tokens). Convert to the
+            // current display currency for the visible price input.
+            const tokenPriceUSD = ratio * 2
+            const tokenPriceDisplay = convertUSDToBillingDisplay(tokenPriceUSD)
+            setPromptPrice(tokenPriceDisplay.toString())
             if (completionRatio !== undefined && completionRatio !== null) {
-              const compPrice = tokenPrice * completionRatio
-              setCompletionPrice(compPrice.toString())
+              const compPriceDisplay = tokenPriceDisplay * completionRatio
+              setCompletionPrice(compPriceDisplay.toString())
             }
           }
           form.reset({
@@ -609,7 +694,12 @@ export function ModelMutateDrawer({
                 values.price &&
                 values.price !== ''
               ) {
-                priceMap[finalModelName] = parseFloat(values.price)
+                // Per-request price is entered in the display currency; store
+                // as base USD so it stays consistent with commission redemption
+                // and topup accounting (both anchored to USDExchangeRate).
+                priceMap[finalModelName] = convertBillingDisplayToUSD(
+                  parseFloat(values.price)
+                )
               } else if (pricingMode === 'per-token') {
                 if (values.ratio && values.ratio !== '') {
                   ratioMap[finalModelName] = parseFloat(values.ratio)
@@ -1198,6 +1288,21 @@ export function ModelMutateDrawer({
                 {t('Pricing Configuration')}
               </h3>
 
+              <OfficialPricingReference
+                modelName={form.watch('model_name')}
+                pricingMode={pricingMode}
+                current={{
+                  ratio: form.watch('ratio'),
+                  completionRatio: form.watch('completionRatio'),
+                  cacheRatio: form.watch('cacheRatio'),
+                  imageRatio: form.watch('imageRatio'),
+                  audioRatio: form.watch('audioRatio'),
+                  audioCompletionRatio: form.watch('audioCompletionRatio'),
+                  price: form.watch('price'),
+                }}
+                onApply={applyOfficialPricing}
+              />
+
               <div className="space-y-4">
                 <Label>{t('Pricing mode')}</Label>
                 <RadioGroup
@@ -1247,9 +1352,12 @@ export function ModelMutateDrawer({
                       </FormControl>
                       <FormDescription>
                         {field.value && !isNaN(parseFloat(field.value))
-                          ? formatRequestPriceRule(parseFloat(field.value))
+                          ? formatRequestPriceRule(
+                              convertBillingDisplayToUSD(parseFloat(field.value))
+                            )
                           : t(
-                              'Stored as base USD per request. The billing rule preview follows the current display currency.'
+                              'Enter price in {{currency}} per request; stored as base USD after conversion.',
+                              { currency: pricingCurrencyLabel }
                             )}
                       </FormDescription>
                       <FormMessage />
@@ -1301,8 +1409,14 @@ export function ModelMutateDrawer({
                                   if (validateNumber(value)) {
                                     field.onChange(value)
                                     if (value) {
+                                      // ratio field is USD-anchored; mirror
+                                      // the equivalent display-currency price
+                                      // so a mode-switch shows the right value.
+                                      const usdPrice = parseFloat(value) * 2
                                       setPromptPrice(
-                                        (parseFloat(value) * 2).toString()
+                                        convertUSDToBillingDisplay(
+                                          usdPrice
+                                        ).toString()
                                       )
                                     } else {
                                       setPromptPrice('')
@@ -1338,11 +1452,18 @@ export function ModelMutateDrawer({
                                     field.onChange(value)
                                     const ratio = form.getValues('ratio')
                                     if (value && ratio) {
-                                      const compPrice =
+                                      // Mirror completion price in display
+                                      // currency for consistency across mode
+                                      // switches.
+                                      const compPriceUSD =
                                         parseFloat(ratio) *
                                         2 *
                                         parseFloat(value)
-                                      setCompletionPrice(compPrice.toString())
+                                      setCompletionPrice(
+                                        convertUSDToBillingDisplay(
+                                          compPriceUSD
+                                        ).toString()
+                                      )
                                     } else {
                                       setCompletionPrice('')
                                     }
@@ -1353,10 +1474,11 @@ export function ModelMutateDrawer({
                             <FormDescription>
                               {field.value &&
                                 !isNaN(parseFloat(field.value)) &&
-                                promptPrice &&
-                                !isNaN(parseFloat(promptPrice))
+                                form.getValues('ratio') &&
+                                !isNaN(parseFloat(form.getValues('ratio') || ''))
                                 ? formatModelPriceRule(
-                                    parseFloat(promptPrice) *
+                                    parseFloat(form.getValues('ratio') || '0') *
+                                      2 *
                                       parseFloat(field.value)
                                   )
                                 : t('Multiplier for completion tokens.')}
@@ -1385,8 +1507,20 @@ export function ModelMutateDrawer({
                           />
                           <p className="text-muted-foreground text-sm">
                             {promptPrice && !isNaN(parseFloat(promptPrice))
-                              ? `Calculated ratio: ${(parseFloat(promptPrice) / 2).toFixed(4)}`
-                              : t('Enter Input price to calculate ratio')}
+                              ? t(
+                                  'Calculated ratio: {{ratio}} (stored as base USD)',
+                                  {
+                                    ratio: (
+                                      convertBillingDisplayToUSD(
+                                        parseFloat(promptPrice)
+                                      ) / 2
+                                    ).toFixed(4),
+                                  }
+                                )
+                              : t(
+                                  'Enter input price in {{currency}}; stored as base USD after conversion.',
+                                  { currency: pricingCurrencyLabel }
+                                )}
                           </p>
                         </div>
 
@@ -1410,8 +1544,19 @@ export function ModelMutateDrawer({
                               promptPrice &&
                               !isNaN(parseFloat(promptPrice)) &&
                               parseFloat(promptPrice) > 0
-                              ? `Calculated ratio: ${(parseFloat(completionPrice) / parseFloat(promptPrice)).toFixed(4)}`
-                              : t('Enter Completion price to calculate ratio')}
+                              ? t(
+                                  'Calculated ratio: {{ratio}} (stored as base USD)',
+                                  {
+                                    ratio: (
+                                      parseFloat(completionPrice) /
+                                      parseFloat(promptPrice)
+                                    ).toFixed(4),
+                                  }
+                                )
+                              : t(
+                                  'Enter completion price in {{currency}}; stored as base USD after conversion.',
+                                  { currency: pricingCurrencyLabel }
+                                )}
                           </p>
                         </div>
                       </div>
@@ -1588,7 +1733,9 @@ export function ModelMutateDrawer({
                         {t('Official Sync')}
                       </FormLabel>
                       <FormDescription>
-                        {t('Sync this model with official upstream')}
+                        {t(
+                          'Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.'
+                        )}
                       </FormDescription>
                     </div>
                     <FormControl>

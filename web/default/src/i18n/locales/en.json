@@ -5144,6 +5144,18 @@
     "Voided": "Voided",
     "settled": "settled",
     "voided": "voided",
-    "quota": "quota"
+    "quota": "quota",
+    "Calculated ratio: {{ratio}} (stored as base USD)": "Calculated ratio: {{ratio}} (stored as base USD)",
+    "Enter input price in {{currency}}; stored as base USD after conversion.": "Enter input price in {{currency}}; stored as base USD after conversion.",
+    "Enter completion price in {{currency}}; stored as base USD after conversion.": "Enter completion price in {{currency}}; stored as base USD after conversion.",
+    "Enter price in {{currency}} per request; stored as base USD after conversion.": "Enter price in {{currency}} per request; stored as base USD after conversion.",
+    "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.": "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.",
+    "Official reference price": "Official reference price",
+    "No official price available for this model.": "No official price available for this model.",
+    "Apply official price": "Apply official price",
+    "Loading official price...": "Loading official price...",
+    "Source: {{source}}": "Source: {{source}}",
+    "Overwrite existing values?": "Overwrite existing values?",
+    "Some pricing fields already have values that differ from the official price. Applying will overwrite them.": "Some pricing fields already have values that differ from the official price. Applying will overwrite them."
   }
 }

@@ -5095,6 +5095,18 @@
     "Maximum context tokens supported by this model (e.g. 128000).": "该模型支持的最大上下文 token 数（如 128000）。",
     "One gateway to access global AI models.": "一处接入全球 AI 模型。",
     "Vendors": "厂商",
-    "Service availability": "服务可用性"
+    "Service availability": "服务可用性",
+    "Calculated ratio: {{ratio}} (stored as base USD)": "Tỷ lệ tính toán: {{ratio}} (lưu theo USD cơ sở)",
+    "Enter input price in {{currency}}; stored as base USD after conversion.": "Nhập giá đầu vào theo {{currency}}; sẽ được lưu theo USD cơ sở sau khi chuyển đổi.",
+    "Enter completion price in {{currency}}; stored as base USD after conversion.": "Nhập giá đầu ra theo {{currency}}; sẽ được lưu theo USD cơ sở sau khi chuyển đổi.",
+    "Enter price in {{currency}} per request; stored as base USD after conversion.": "Nhập giá theo {{currency}}/yêu cầu; sẽ được lưu theo USD cơ sở sau khi chuyển đổi.",
+    "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.": "Đưa mô hình này vào đồng bộ metadata hàng loạt (mô tả/biểu tượng/thẻ/nhà cung cấp). Giá được quản lý riêng ở mục phía trên.",
+    "Official reference price": "Giá tham chiếu chính thức",
+    "No official price available for this model.": "Không có giá chính thức cho mô hình này.",
+    "Apply official price": "Áp dụng giá chính thức",
+    "Loading official price...": "Đang tải giá chính thức...",
+    "Source: {{source}}": "Nguồn: {{source}}",
+    "Overwrite existing values?": "Ghi đè các giá trị hiện có?",
+    "Some pricing fields already have values that differ from the official price. Applying will overwrite them.": "Một số trường giá đã có giá trị khác với giá chính thức. Áp dụng sẽ ghi đè."
   }
 }

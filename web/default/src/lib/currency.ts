@@ -466,6 +466,61 @@ export function formatBillingCurrencyFromUSD(
 }
 
 /**
+ * Convert a billing amount entered in the current display currency back to
+ * base USD, using the SAME exchange rate that `formatBillingCurrencyFromUSD`
+ * uses for the reverse direction. This is a round-trip pair so a value written
+ * out in one currency and read back in another stays consistent.
+ *
+ * Intent: admins configure pricing in whatever currency the dashboard is
+ * currently displaying (CNY / CUSTOM), but the system stores every price as
+ * base USD (matching commission redemption in `service/commission/redeem.go`
+ * and topup in `controller/misc.go` — both anchored to `USDExchangeRate`).
+ *
+ * TOKENS display falls back to USD (no currency conversion) — same rule as
+ * `getBillingDisplayMeta`.
+ *
+ * @example
+ * // With quotaDisplayType: 'CNY', usdExchangeRate: 7.3
+ * convertBillingDisplayToUSD(46) → 6.30...   (46 / 7.3)
+ *
+ * @example
+ * // With quotaDisplayType: 'USD'
+ * convertBillingDisplayToUSD(46) → 46        (no-op)
+ */
+export function convertBillingDisplayToUSD(
+  amountDisplay: number | null | undefined
+): number {
+  if (amountDisplay == null || Number.isNaN(amountDisplay)) return Number.NaN
+  const { config } = getCurrencyDisplay()
+  const meta = getBillingDisplayMeta(config)
+  if (meta.kind === 'tokens') return amountDisplay
+  if (!meta.exchangeRate || meta.exchangeRate <= 0) return amountDisplay
+  return amountDisplay / meta.exchangeRate
+}
+
+/**
+ * Companion to {@link convertBillingDisplayToUSD}: given a base-USD amount
+ * (as stored in DB), return the numeric value in the currently displayed
+ * currency. Use this to prefill an editable input, NOT for read-only display —
+ * for read-only display, use `formatBillingCurrencyFromUSD` which also adds
+ * a currency symbol.
+ *
+ * @example
+ * // With quotaDisplayType: 'CNY', usdExchangeRate: 7.3
+ * convertUSDToBillingDisplay(6.30) → 45.99   (6.30 * 7.3)
+ */
+export function convertUSDToBillingDisplay(
+  amountUSD: number | null | undefined
+): number {
+  if (amountUSD == null || Number.isNaN(amountUSD)) return Number.NaN
+  const { config } = getCurrencyDisplay()
+  const meta = getBillingDisplayMeta(config)
+  if (meta.kind === 'tokens') return amountUSD
+  if (!meta.exchangeRate || meta.exchangeRate <= 0) return amountUSD
+  return amountUSD * meta.exchangeRate
+}
+
+/**
  * Format raw quota values (token units) to display currency.
  *
  * Converts raw quota/token amounts to USD first, then formats according

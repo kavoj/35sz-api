@@ -5095,6 +5095,18 @@
     "Maximum context tokens supported by this model (e.g. 128000).": "该模型支持的最大上下文 token 数（如 128000）。",
     "One gateway to access global AI models.": "一处接入全球 AI 模型。",
     "Vendors": "厂商",
-    "Service availability": "服务可用性"
+    "Service availability": "服务可用性",
+    "Calculated ratio: {{ratio}} (stored as base USD)": "Рассчитанный коэффициент: {{ratio}} (хранится в базовом USD)",
+    "Enter input price in {{currency}}; stored as base USD after conversion.": "Введите цену ввода в {{currency}}; будет сохранено в базовом USD после конверсии.",
+    "Enter completion price in {{currency}}; stored as base USD after conversion.": "Введите цену вывода в {{currency}}; будет сохранено в базовом USD после конверсии.",
+    "Enter price in {{currency}} per request; stored as base USD after conversion.": "Введите цену в {{currency}} за запрос; будет сохранено в базовом USD после конверсии.",
+    "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.": "Включить эту модель в массовую синхронизацию метаданных (описание, иконка, теги, поставщик). Цены управляются отдельно в разделе выше.",
+    "Official reference price": "Официальная справочная цена",
+    "No official price available for this model.": "Официальная цена для этой модели недоступна.",
+    "Apply official price": "Применить официальную цену",
+    "Loading official price...": "Загрузка официальной цены...",
+    "Source: {{source}}": "Источник: {{source}}",
+    "Overwrite existing values?": "Перезаписать существующие значения?",
+    "Some pricing fields already have values that differ from the official price. Applying will overwrite them.": "Некоторые поля цены уже содержат значения, отличные от официальной цены. Применение перезапишет их."
   }
 }

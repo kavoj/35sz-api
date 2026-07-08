@@ -5095,6 +5095,18 @@
     "Maximum context tokens supported by this model (e.g. 128000).": "该模型支持的最大上下文 token 数（如 128000）。",
     "One gateway to access global AI models.": "一处接入全球 AI 模型。",
     "Vendors": "厂商",
-    "Service availability": "服务可用性"
+    "Service availability": "服务可用性",
+    "Calculated ratio: {{ratio}} (stored as base USD)": "計算された倍率: {{ratio}}（基準 USD で保存）",
+    "Enter input price in {{currency}}; stored as base USD after conversion.": "入力価格を {{currency}} で入力してください。基準 USD に換算して保存されます。",
+    "Enter completion price in {{currency}}; stored as base USD after conversion.": "出力価格を {{currency}} で入力してください。基準 USD に換算して保存されます。",
+    "Enter price in {{currency}} per request; stored as base USD after conversion.": "リクエスト単位の価格を {{currency}} で入力してください。基準 USD に換算して保存されます。",
+    "Include this model in bulk metadata sync (description, icon, tags, vendor). Pricing is managed separately in the section above.": "一括メタデータ同期の対象に含める（説明/アイコン/タグ/ベンダー）。価格は上のセクションで個別に管理します。",
+    "Official reference price": "公式参考価格",
+    "No official price available for this model.": "このモデルの公式価格情報がありません。手動で入力してください。",
+    "Apply official price": "公式価格を適用",
+    "Loading official price...": "公式価格を読み込み中…",
+    "Source: {{source}}": "データソース: {{source}}",
+    "Overwrite existing values?": "既存の値を上書きしますか？",
+    "Some pricing fields already have values that differ from the official price. Applying will overwrite them.": "一部の価格フィールドは既に公式価格と異なる値が入力されています。適用すると上書きされます。"
   }
 }
