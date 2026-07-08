@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/commission"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
@@ -144,6 +145,11 @@ func AlipayNotify(c *gin.Context) {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("支付宝支付 充值处理失败 trade_no=%s error=%q", tradeNo, err.Error()))
 		_, _ = c.Writer.Write([]byte("fail"))
 		return
+	}
+	// Fire commission recording asynchronously so any downstream bug can never
+	// stall the payment callback.
+	if topUp := model.GetTopUpByTradeNo(tradeNo); topUp != nil {
+		go commission.OnTopupCompleted(topUp)
 	}
 	_, _ = c.Writer.Write([]byte("success"))
 }

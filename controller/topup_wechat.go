@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/commission"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -149,6 +150,9 @@ func WechatNotify(c *gin.Context) {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("微信支付 充值处理失败 trade_no=%s error=%q", tradeNo, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "recharge failed"})
 		return
+	}
+	if topUp := model.GetTopUpByTradeNo(tradeNo); topUp != nil {
+		go commission.OnTopupCompleted(topUp)
 	}
 	c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
 }
