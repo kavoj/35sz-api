@@ -61,6 +61,7 @@ import { Route as AuthenticatedSystemSettingsSecurityIndexRouteImport } from './
 import { Route as AuthenticatedSystemSettingsOperationsIndexRouteImport } from './routes/_authenticated/system-settings/operations/index'
 import { Route as AuthenticatedSystemSettingsModelsIndexRouteImport } from './routes/_authenticated/system-settings/models/index'
 import { Route as AuthenticatedSystemSettingsContentIndexRouteImport } from './routes/_authenticated/system-settings/content/index'
+import { Route as AuthenticatedSystemSettingsCommissionIndexRouteImport } from './routes/_authenticated/system-settings/commission/index'
 import { Route as AuthenticatedSystemSettingsBillingIndexRouteImport } from './routes/_authenticated/system-settings/billing/index'
 import { Route as AuthenticatedSystemSettingsAuthIndexRouteImport } from './routes/_authenticated/system-settings/auth/index'
 import { Route as AuthenticatedSystemSettingsSiteSectionRouteImport } from './routes/_authenticated/system-settings/site/$section'
@@ -351,6 +352,12 @@ const AuthenticatedSystemSettingsContentIndexRoute =
     path: '/content/',
     getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
   } as any)
+const AuthenticatedSystemSettingsCommissionIndexRoute =
+  AuthenticatedSystemSettingsCommissionIndexRouteImport.update({
+    id: '/commission/',
+    path: '/commission/',
+    getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
+  } as any)
 const AuthenticatedSystemSettingsBillingIndexRoute =
   AuthenticatedSystemSettingsBillingIndexRouteImport.update({
     id: '/billing/',
@@ -461,6 +468,7 @@ export interface FileRoutesByFullPath {
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
   '/system-settings/auth/': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
+  '/system-settings/commission/': typeof AuthenticatedSystemSettingsCommissionIndexRoute
   '/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/system-settings/models/': typeof AuthenticatedSystemSettingsModelsIndexRoute
   '/system-settings/operations/': typeof AuthenticatedSystemSettingsOperationsIndexRoute
@@ -521,6 +529,7 @@ export interface FileRoutesByTo {
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
   '/system-settings/auth': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/system-settings/billing': typeof AuthenticatedSystemSettingsBillingIndexRoute
+  '/system-settings/commission': typeof AuthenticatedSystemSettingsCommissionIndexRoute
   '/system-settings/content': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/system-settings/models': typeof AuthenticatedSystemSettingsModelsIndexRoute
   '/system-settings/operations': typeof AuthenticatedSystemSettingsOperationsIndexRoute
@@ -585,6 +594,7 @@ export interface FileRoutesById {
   '/_authenticated/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
   '/_authenticated/system-settings/auth/': typeof AuthenticatedSystemSettingsAuthIndexRoute
   '/_authenticated/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
+  '/_authenticated/system-settings/commission/': typeof AuthenticatedSystemSettingsCommissionIndexRoute
   '/_authenticated/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/_authenticated/system-settings/models/': typeof AuthenticatedSystemSettingsModelsIndexRoute
   '/_authenticated/system-settings/operations/': typeof AuthenticatedSystemSettingsOperationsIndexRoute
@@ -648,6 +658,7 @@ export interface FileRouteTypes {
     | '/system-settings/site/$section'
     | '/system-settings/auth/'
     | '/system-settings/billing/'
+    | '/system-settings/commission/'
     | '/system-settings/content/'
     | '/system-settings/models/'
     | '/system-settings/operations/'
@@ -708,6 +719,7 @@ export interface FileRouteTypes {
     | '/system-settings/site/$section'
     | '/system-settings/auth'
     | '/system-settings/billing'
+    | '/system-settings/commission'
     | '/system-settings/content'
     | '/system-settings/models'
     | '/system-settings/operations'
@@ -771,6 +783,7 @@ export interface FileRouteTypes {
     | '/_authenticated/system-settings/site/$section'
     | '/_authenticated/system-settings/auth/'
     | '/_authenticated/system-settings/billing/'
+    | '/_authenticated/system-settings/commission/'
     | '/_authenticated/system-settings/content/'
     | '/_authenticated/system-settings/models/'
     | '/_authenticated/system-settings/operations/'
@@ -1165,6 +1178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSystemSettingsContentIndexRouteImport
       parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
     }
+    '/_authenticated/system-settings/commission/': {
+      id: '/_authenticated/system-settings/commission/'
+      path: '/commission'
+      fullPath: '/system-settings/commission/'
+      preLoaderRoute: typeof AuthenticatedSystemSettingsCommissionIndexRouteImport
+      parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
+    }
     '/_authenticated/system-settings/billing/': {
       id: '/_authenticated/system-settings/billing/'
       path: '/billing'
@@ -1268,6 +1288,7 @@ interface AuthenticatedSystemSettingsRouteRouteChildren {
   AuthenticatedSystemSettingsSiteSectionRoute: typeof AuthenticatedSystemSettingsSiteSectionRoute
   AuthenticatedSystemSettingsAuthIndexRoute: typeof AuthenticatedSystemSettingsAuthIndexRoute
   AuthenticatedSystemSettingsBillingIndexRoute: typeof AuthenticatedSystemSettingsBillingIndexRoute
+  AuthenticatedSystemSettingsCommissionIndexRoute: typeof AuthenticatedSystemSettingsCommissionIndexRoute
   AuthenticatedSystemSettingsContentIndexRoute: typeof AuthenticatedSystemSettingsContentIndexRoute
   AuthenticatedSystemSettingsModelsIndexRoute: typeof AuthenticatedSystemSettingsModelsIndexRoute
   AuthenticatedSystemSettingsOperationsIndexRoute: typeof AuthenticatedSystemSettingsOperationsIndexRoute
@@ -1297,6 +1318,8 @@ const AuthenticatedSystemSettingsRouteRouteChildren: AuthenticatedSystemSettings
       AuthenticatedSystemSettingsAuthIndexRoute,
     AuthenticatedSystemSettingsBillingIndexRoute:
       AuthenticatedSystemSettingsBillingIndexRoute,
+    AuthenticatedSystemSettingsCommissionIndexRoute:
+      AuthenticatedSystemSettingsCommissionIndexRoute,
     AuthenticatedSystemSettingsContentIndexRoute:
       AuthenticatedSystemSettingsContentIndexRoute,
     AuthenticatedSystemSettingsModelsIndexRoute:
