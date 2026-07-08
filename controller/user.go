@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
+	"github.com/QuantumNous/new-api/service/commission"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
@@ -236,6 +237,12 @@ func Register(c *gin.Context) {
 	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
+	}
+	// Snapshot the L1/L2 uplines for commission payout targeting. Failure is
+	// non-fatal: registration succeeds and the user simply loses referral
+	// commission eligibility. Investigated via SysLog.
+	if err := commission.BuildReferralPath(insertedUser.Id, inviterId); err != nil {
+		common.SysError(fmt.Sprintf("BuildReferralPath failed user=%d inviter=%d err=%v", insertedUser.Id, inviterId, err))
 	}
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
