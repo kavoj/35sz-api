@@ -112,6 +112,14 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/aff_transfer", controller.TransferAffQuota)
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
 
+				// Referral commission routes (per-user view)
+				selfRoute.GET("/commission/stats", controller.GetCommissionStats)
+				selfRoute.GET("/commission/records", controller.GetMyCommissionRecords)
+				selfRoute.GET("/commission/redemptions", controller.GetMyRedemptions)
+				selfRoute.GET("/commission/downlines", controller.GetMyDownlines)
+				selfRoute.GET("/commission/quota-preview", controller.GetQuotaPreview)
+				selfRoute.POST("/commission/redeem", middleware.CriticalRateLimit(), controller.RedeemCommission)
+
 				// 2FA routes
 				selfRoute.GET("/2fa/status", controller.Get2FAStatus)
 				selfRoute.POST("/2fa/setup", controller.Setup2FA)
