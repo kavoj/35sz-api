@@ -14,7 +14,9 @@ export function useRedeemCommission() {
   return useMutation({
     mutationFn: (cents: number) => redeemCommission(cents),
     onSuccess: (data) => {
-      toast.success(`${t('Redeem success')} +${data.quota_credited.toLocaleString()}`)
+      toast.success(
+        `${t('Redeem success')} +${data.quota_credited.toLocaleString()}`
+      )
       // Refresh both commission counters and the user's wallet quota.
       void qc.invalidateQueries({ queryKey: ['commission'] })
       void qc.invalidateQueries({ queryKey: ['self'] })

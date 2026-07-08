@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QRCodeSVG } from 'qrcode.react'
 import { useTranslation } from 'react-i18next'
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +50,9 @@ export function WechatQrPayDialog(props: WechatQrPayDialogProps) {
         </AlertDialogHeader>
         <div className='flex justify-center py-4'>
           <div className='rounded-xl border bg-white p-4'>
-            {props.codeUrl ? <QRCodeSVG value={props.codeUrl} size={220} /> : null}
+            {props.codeUrl ? (
+              <QRCodeSVG value={props.codeUrl} size={220} />
+            ) : null}
           </div>
         </div>
         <AlertDialogFooter>

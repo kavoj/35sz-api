@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+
 import { fetchUpstreamRatios } from '@/features/system-settings/api'
 import {
   MODELS_DEV_PRESET_ENDPOINT,
@@ -107,7 +108,9 @@ function pickNumber(
     return undefined
   }
   const num =
-    typeof upstream === 'number' ? upstream : Number.parseFloat(String(upstream))
+    typeof upstream === 'number'
+      ? upstream
+      : Number.parseFloat(String(upstream))
   return Number.isFinite(num) ? num : undefined
 }
 
@@ -125,7 +128,12 @@ function snapshotForSource(
     modelRatio,
     completionRatio: pickNumber(diffs, model, 'completion_ratio', sourceName),
     cacheRatio: pickNumber(diffs, model, 'cache_ratio', sourceName),
-    createCacheRatio: pickNumber(diffs, model, 'create_cache_ratio', sourceName),
+    createCacheRatio: pickNumber(
+      diffs,
+      model,
+      'create_cache_ratio',
+      sourceName
+    ),
     imageRatio: pickNumber(diffs, model, 'image_ratio', sourceName),
     audioRatio: pickNumber(diffs, model, 'audio_ratio', sourceName),
     audioCompletionRatio: pickNumber(

@@ -16,13 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { ArrowLeft, Code2, HeartPulse, Info, Timer } from 'lucide-react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getLobeIcon } from '@/lib/lobe-icon'
-import { cn } from '@/lib/utils'
+
+import { CopyButton } from '@/components/copy-button'
+import { sideDrawerContentClassName } from '@/components/drawer-layout'
+import { GroupBadge } from '@/components/group-badge'
+import { PublicLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -41,16 +44,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CopyButton } from '@/components/copy-button'
-import { sideDrawerContentClassName } from '@/components/drawer-layout'
-import { GroupBadge } from '@/components/group-badge'
-import { PublicLayout } from '@/components/layout'
 import { getPerfMetrics } from '@/features/performance-metrics/api'
 import {
   formatLatency,
   formatThroughput,
   formatUptimePct,
 } from '@/features/performance-metrics/lib/format'
+import { getLobeIcon } from '@/lib/lobe-icon'
+import { cn } from '@/lib/utils'
+
 import { DEFAULT_TOKEN_UNIT, QUOTA_TYPE_VALUES } from '../constants'
 import { usePricingData } from '../hooks/use-pricing-data'
 import {
@@ -269,12 +271,10 @@ function ModelHeader(props: { model: PricingModel }) {
   const { t } = useTranslation()
   const model = props.model
   const modelIconKey = model.icon || model.vendor_icon
-  const modelIcon = modelIconKey
-    ? getLobeIcon(modelIconKey, 20)
-    : null
+  const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 20) : null
   const description = model.description || model.vendor_description || null
   const tags = parseTags(model.tags)
-  const translatedTags = tags.map(tag => t(tag))
+  const translatedTags = tags.map((tag) => t(tag))
   const isSpecialExpression =
     model.billing_mode === 'tiered_expr' &&
     Boolean(model.billing_expr) &&

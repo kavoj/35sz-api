@@ -9,7 +9,9 @@ export type WechatPemFileKind = 'cert' | 'key'
  *   - "apiclient_cert.pem.txt" (extra extension)
  * The authoritative decision is made by {@link detectWechatPemKindByContent}.
  */
-export function getWechatPemFileKind(fileName: string): WechatPemFileKind | null {
+export function getWechatPemFileKind(
+  fileName: string
+): WechatPemFileKind | null {
   const normalized = fileName.trim().toLowerCase()
   if (normalized.includes('apiclient_cert')) return 'cert'
   if (normalized.includes('apiclient_key')) return 'key'

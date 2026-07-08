@@ -17,7 +17,9 @@ export function InviteCodeCard({ affCode }: { affCode: string }) {
         <CardTitle>{t('My Invite Code')}</CardTitle>
       </CardHeader>
       <CardContent className='flex items-center gap-3'>
-        <span className='font-mono text-2xl tracking-widest'>{affCode || '—'}</span>
+        <span className='font-mono text-2xl tracking-widest'>
+          {affCode || '—'}
+        </span>
         <Button
           variant='outline'
           size='sm'

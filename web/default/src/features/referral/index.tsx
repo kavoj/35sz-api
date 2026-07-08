@@ -4,12 +4,7 @@ Copyright (C) 2023-2026 QuantumNous
 */
 import { useTranslation } from 'react-i18next'
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { CommissionStatsCard } from './components/commission-stats-card'
 import { DownlinesTable } from './components/downlines-table'
@@ -25,7 +20,7 @@ export function ReferralPage() {
 
   if (isLoading || !stats) {
     return (
-      <div className='p-6 text-muted-foreground'>
+      <div className='text-muted-foreground p-6'>
         {isLoading ? t('Loading…') : (error as Error | null)?.message}
       </div>
     )

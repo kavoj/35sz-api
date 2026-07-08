@@ -16,13 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import * as React from 'react'
-import * as z from 'zod'
-import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Upload, X } from 'lucide-react'
+import * as React from 'react'
+import type { Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Upload, X } from 'lucide-react'
+import * as z from 'zod'
+
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -32,7 +34,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -43,6 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
 import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
@@ -280,10 +282,14 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                   // Get showUrlInput state from LogoUploadField
                   // We'll use form state or a separate state manager
                   const [showUrlInput, setShowUrlInput] = React.useState(false)
-                  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+                  const fileInputRef = React.useRef<HTMLInputElement | null>(
+                    null
+                  )
                   const { t } = useTranslation()
 
-                  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                  const handleFileChange = (
+                    event: React.ChangeEvent<HTMLInputElement>
+                  ) => {
                     const file = event.target.files?.[0]
                     if (!file) return
 
@@ -307,10 +313,13 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       img.onload = () => {
                         if (img.width > 128 || img.height > 128) {
                           toast.error(
-                            t('Image dimensions must be {{width}}x{{height}} or smaller', {
-                              width: 128,
-                              height: 128,
-                            })
+                            t(
+                              'Image dimensions must be {{width}}x{{height}} or smaller',
+                              {
+                                width: 128,
+                                height: 128,
+                              }
+                            )
                           )
                           event.target.value = ''
                           return
@@ -391,7 +400,11 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                           <div className='relative mt-2'>
                             <Input
                               placeholder={t('https://example.com/logo.png')}
-                              value={field.value?.startsWith('data:') ? '' : field.value || ''}
+                              value={
+                                field.value?.startsWith('data:')
+                                  ? ''
+                                  : field.value || ''
+                              }
                               onChange={(e) => {
                                 if (!e.target.value.startsWith('data:')) {
                                   field.onChange(e.target.value)
@@ -402,7 +415,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                               type='button'
                               variant='ghost'
                               size='sm'
-                              className='absolute right-1 top-1/2 h-7 -translate-y-1/2'
+                              className='absolute top-1/2 right-1 h-7 -translate-y-1/2'
                               onClick={() => setShowUrlInput(false)}
                             >
                               <X className='h-4 w-4' />

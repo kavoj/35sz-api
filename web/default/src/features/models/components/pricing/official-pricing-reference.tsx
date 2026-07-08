@@ -16,12 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, useState } from 'react'
 import { Loader2, RefreshCcw } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +30,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+
 import {
   useOfficialPricing,
   type OfficialPricing,
@@ -98,8 +100,8 @@ export function OfficialPricingReference({
 
   if (isLoading) {
     return (
-      <div className="bg-muted/40 flex items-center gap-2 rounded-md border p-3 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
+      <div className='bg-muted/40 flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <Loader2 className='h-4 w-4 animate-spin' />
         <span>{t('Loading official price...')}</span>
       </div>
     )
@@ -107,7 +109,7 @@ export function OfficialPricingReference({
 
   if (!data) {
     return (
-      <div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-sm">
+      <div className='bg-muted/40 text-muted-foreground rounded-md border p-3 text-sm'>
         {t('No official price available for this model.')}
       </div>
     )
@@ -117,21 +119,23 @@ export function OfficialPricingReference({
 
   return (
     <>
-      <div className="bg-muted/40 flex flex-col gap-2 rounded-md border p-3 text-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">{t('Official reference price')}</Badge>
-            <span className="text-muted-foreground text-xs">
+      <div className='bg-muted/40 flex flex-col gap-2 rounded-md border p-3 text-sm'>
+        <div className='flex flex-wrap items-center justify-between gap-2'>
+          <div className='flex items-center gap-2'>
+            <Badge variant='secondary'>{t('Official reference price')}</Badge>
+            <span className='text-muted-foreground text-xs'>
               {t('Source: {{source}}', {
                 source:
-                  data.source === 'official' ? 'basellm.github.io' : 'models.dev',
+                  data.source === 'official'
+                    ? 'basellm.github.io'
+                    : 'models.dev',
               })}
             </span>
           </div>
           <Button
-            type="button"
-            size="sm"
-            variant="outline"
+            type='button'
+            size='sm'
+            variant='outline'
             disabled={!canApply}
             onClick={() => {
               if (overwrittenFields.length > 0) {
@@ -141,7 +145,7 @@ export function OfficialPricingReference({
               }
             }}
           >
-            <RefreshCcw className="mr-1 h-3 w-3" />
+            <RefreshCcw className='mr-1 h-3 w-3' />
             {t('Apply official price')}
           </Button>
         </div>
@@ -151,7 +155,9 @@ export function OfficialPricingReference({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('Overwrite existing values?')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t('Overwrite existing values?')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t(
                 'Some pricing fields already have values that differ from the official price. Applying will overwrite them.'
@@ -181,8 +187,11 @@ export function OfficialPricingReference({
 
 function ReferenceRows({ data }: { data: OfficialPricing }) {
   const { t } = useTranslation()
-  const cells: Array<{ label: string; usd: number | undefined; per: 'M' | 'req' }> =
-    []
+  const cells: Array<{
+    label: string
+    usd: number | undefined
+    per: 'M' | 'req'
+  }> = []
 
   if (data.modelRatio !== undefined) {
     const inputUSD = data.modelRatio * 2
@@ -231,18 +240,18 @@ function ReferenceRows({ data }: { data: OfficialPricing }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+    <div className='flex flex-wrap gap-x-4 gap-y-1 text-xs'>
       {cells.map((c) => (
-        <span key={c.label} className="whitespace-nowrap">
-          <span className="text-muted-foreground">{c.label}:</span>{' '}
-          <span className="font-medium">
+        <span key={c.label} className='whitespace-nowrap'>
+          <span className='text-muted-foreground'>{c.label}:</span>{' '}
+          <span className='font-medium'>
             {formatBillingCurrencyFromUSD(c.usd, {
               abbreviate: false,
               digitsLarge: 4,
               digitsSmall: 4,
             })}
           </span>
-          <span className="text-muted-foreground">
+          <span className='text-muted-foreground'>
             {c.per === 'M' ? ' / 1M' : ' / req'}
           </span>
         </span>

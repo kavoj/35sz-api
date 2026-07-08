@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useCallback } from 'react'
 import i18next from 'i18next'
+import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
+
 import {
   calculateAmount,
   calculateAlipayAmount,
@@ -105,9 +106,15 @@ export function usePayment() {
               payment_method: 'stripe',
             })
           : isAlipay
-            ? await requestAlipayPayment({ amount, payment_method: paymentType })
+            ? await requestAlipayPayment({
+                amount,
+                payment_method: paymentType,
+              })
             : isWechat
-              ? await requestWechatPayment({ amount, payment_method: paymentType })
+              ? await requestWechatPayment({
+                  amount,
+                  payment_method: paymentType,
+                })
               : await requestPayment({
                   amount,
                   payment_method: paymentType,

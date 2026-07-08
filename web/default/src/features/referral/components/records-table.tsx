@@ -64,7 +64,10 @@ export function RecordsTable() {
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={8} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={8}
+                className='text-muted-foreground text-center'
+              >
                 {t('Loading…')}
               </TableCell>
             </TableRow>
@@ -90,14 +93,17 @@ export function RecordsTable() {
             ))}
           {!isLoading && (data?.records.length ?? 0) === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={8}
+                className='text-muted-foreground text-center'
+              >
                 {t('No data')}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-      <div className='flex items-center justify-between text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex items-center justify-between text-sm'>
         <span>
           {t('Page')} {page} / {totalPages}
         </span>

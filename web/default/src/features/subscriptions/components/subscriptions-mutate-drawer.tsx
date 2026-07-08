@@ -16,13 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from 'react'
-import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, CreditCard, RefreshCw, Settings2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getCurrencyLabel } from '@/lib/currency'
+
+import {
+  SideDrawerSection,
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+  sideDrawerFormClassName,
+  sideDrawerHeaderClassName,
+  sideDrawerSwitchItemClassName,
+} from '@/components/drawer-layout'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -52,14 +60,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
-import {
-  SideDrawerSection,
-  sideDrawerContentClassName,
-  sideDrawerFooterClassName,
-  sideDrawerFormClassName,
-  sideDrawerHeaderClassName,
-  sideDrawerSwitchItemClassName,
-} from '@/components/drawer-layout'
+import { getCurrencyLabel } from '@/lib/currency'
+
 import {
   createPlan,
   updatePlan,
@@ -314,7 +316,7 @@ export function SubscriptionsMutateDrawer({
                 )}
               />
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='price_amount'
@@ -373,7 +375,7 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='upgrade_group'
@@ -438,7 +440,7 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='sort_order'
@@ -460,7 +462,7 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='enabled'
@@ -506,7 +508,7 @@ export function SubscriptionsMutateDrawer({
                 {t('Duration Settings')}
               </h3>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='duration_unit'
@@ -596,7 +598,7 @@ export function SubscriptionsMutateDrawer({
                 {t('Quota Reset')}
               </h3>
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 items-start'>
+              <div className='grid grid-cols-1 items-start gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='quota_reset_period'

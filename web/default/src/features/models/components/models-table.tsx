@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useMemo, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import {
@@ -26,12 +25,15 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table'
 import { RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
-import { useMediaQuery } from '@/hooks'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useTableUrlState } from '@/hooks/use-table-url-state'
-import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+
 import { DataTablePage } from '@/components/data-table'
+import { Button } from '@/components/ui/button'
+import { useMediaQuery } from '@/hooks'
+import { useTableUrlState } from '@/hooks/use-table-url-state'
+
 import { getModels, searchModels, getVendors, syncModelVendors } from '../api'
 import {
   DEFAULT_PAGE_SIZE,
@@ -61,13 +63,21 @@ export function ModelsTable() {
         toast.error(res.message || t('Failed to sync vendors'))
         return
       }
-      const data = res.data ?? { updated: 0, unchanged: 0, unmatched: 0, vendors_created: 0 }
+      const data = res.data ?? {
+        updated: 0,
+        unchanged: 0,
+        unmatched: 0,
+        vendors_created: 0,
+      }
       toast.success(
-        t('Synced {{updated}} updated / {{unchanged}} unchanged / {{unmatched}} unmatched', {
-          updated: data.updated,
-          unchanged: data.unchanged,
-          unmatched: data.unmatched,
-        })
+        t(
+          'Synced {{updated}} updated / {{unchanged}} unchanged / {{unmatched}} unmatched',
+          {
+            updated: data.updated,
+            unchanged: data.unchanged,
+            unmatched: data.unmatched,
+          }
+        )
       )
       queryClient.invalidateQueries({ queryKey: modelsQueryKeys.all })
       queryClient.invalidateQueries({ queryKey: vendorsQueryKeys.all })

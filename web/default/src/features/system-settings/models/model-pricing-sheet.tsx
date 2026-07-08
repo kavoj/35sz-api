@@ -16,13 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState } from 'react'
-import * as z from 'zod'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+import * as z from 'zod'
+
+import {
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+} from '@/components/drawer-layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -61,11 +65,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  sideDrawerContentClassName,
-  sideDrawerFooterClassName,
-} from '@/components/drawer-layout'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
+import { cn } from '@/lib/utils'
+
 import {
   SettingsControlGroup,
   SettingsSwitchField,
@@ -327,7 +329,9 @@ function buildPreviewRows(
       {
         key: 'price',
         label: 'ModelPrice',
-        value: values.price ? formatDisplayPricingValue(values.price) : t('Empty'),
+        value: values.price
+          ? formatDisplayPricingValue(values.price)
+          : t('Empty'),
       },
     ]
   }
@@ -526,7 +530,9 @@ export function ModelPricingEditorPanel({
     if (priceNumber === null) return ''
 
     if (lane === 'audioOutput') {
-      const audioInputPrice = displayPricingValueToUsd(nextLanePrices.audioInput)
+      const audioInputPrice = displayPricingValueToUsd(
+        nextLanePrices.audioInput
+      )
       if (audioInputPrice === null || audioInputPrice === 0) return ''
       return formatPricingNumber(priceNumber / audioInputPrice)
     }
@@ -839,7 +845,9 @@ export function ModelPricingEditorPanel({
                         onChange={handlePromptPriceChange}
                       />
                       <FieldDescription>
-                        {t('Price per 1M input tokens in the selected display currency.')}
+                        {t(
+                          'Price per 1M input tokens in the selected display currency.'
+                        )}
                       </FieldDescription>
                     </Field>
 
@@ -883,7 +891,9 @@ export function ModelPricingEditorPanel({
                         <FormLabel>{t('Fixed price')}</FormLabel>
                         <FormControl>
                           <InputGroup>
-                            <InputGroupAddon>{getModelPricingCurrencyPrefix()}</InputGroupAddon>
+                            <InputGroupAddon>
+                              {getModelPricingCurrencyPrefix()}
+                            </InputGroupAddon>
                             <InputGroupInput
                               inputMode='decimal'
                               placeholder='0.01'

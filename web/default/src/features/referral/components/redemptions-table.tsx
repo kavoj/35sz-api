@@ -44,7 +44,10 @@ export function RedemptionsTable() {
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={5} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={5}
+                className='text-muted-foreground text-center'
+              >
                 {t('Loading…')}
               </TableCell>
             </TableRow>
@@ -63,7 +66,10 @@ export function RedemptionsTable() {
             ))}
           {!isLoading && (data?.length ?? 0) === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={5}
+                className='text-muted-foreground text-center'
+              >
                 {t('No data')}
               </TableCell>
             </TableRow>
@@ -71,7 +77,12 @@ export function RedemptionsTable() {
         </TableBody>
       </Table>
       <div className='flex justify-end gap-2 text-sm'>
-        <Button variant='outline' size='sm' disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+        <Button
+          variant='outline'
+          size='sm'
+          disabled={page <= 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
           {t('Previous')}
         </Button>
         <Button

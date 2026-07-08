@@ -26,10 +26,10 @@ globalThis.window = {
 
 describe('formatSubscriptionPlanPrice', () => {
   test('formats plan price with the configured CNY currency symbol', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
-    const { formatSubscriptionPlanPrice } = await import(
-      './subscription-price-format'
-    )
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
+    const { formatSubscriptionPlanPrice } =
+      await import('./subscription-price-format')
 
     useSystemConfigStore.getState().setConfig({
       currency: {

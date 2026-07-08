@@ -34,7 +34,8 @@ globalThis.window = { localStorage: localStorageShim } as unknown as Window &
  */
 describe('billing currency round-trip conversion', () => {
   test('CNY input converts to base USD using the configured rate', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { convertBillingDisplayToUSD } = await import('./currency')
 
     useSystemConfigStore.getState().setConfig({
@@ -54,7 +55,8 @@ describe('billing currency round-trip conversion', () => {
   })
 
   test('USD display is a no-op', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { convertBillingDisplayToUSD, convertUSDToBillingDisplay } =
       await import('./currency')
 
@@ -74,7 +76,8 @@ describe('billing currency round-trip conversion', () => {
   })
 
   test('display→USD→display is lossless within float precision', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { convertBillingDisplayToUSD, convertUSDToBillingDisplay } =
       await import('./currency')
 
@@ -100,7 +103,8 @@ describe('billing currency round-trip conversion', () => {
   })
 
   test('TOKENS display treats input as USD (no exchange)', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { convertBillingDisplayToUSD } = await import('./currency')
 
     useSystemConfigStore.getState().setConfig({
@@ -120,7 +124,8 @@ describe('billing currency round-trip conversion', () => {
   })
 
   test('CUSTOM currency uses customCurrencyExchangeRate', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { convertBillingDisplayToUSD } = await import('./currency')
 
     useSystemConfigStore.getState().setConfig({

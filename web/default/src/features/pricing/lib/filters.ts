@@ -22,8 +22,8 @@ import {
   QUOTA_TYPES,
   QUOTA_TYPE_VALUES,
 } from '../constants'
-import { matchesCapabilityTab, type CapabilityTabValue } from './capabilities'
 import type { PricingModel } from '../types'
+import { matchesCapabilityTab, type CapabilityTabValue } from './capabilities'
 
 // ----------------------------------------------------------------------------
 // Filter Utilities

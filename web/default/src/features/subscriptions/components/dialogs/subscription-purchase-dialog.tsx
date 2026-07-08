@@ -16,14 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect } from 'react'
 import { Crown, CalendarClock, Package } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
-import { formatLocalCurrencyAmount } from '@/lib/currency'
-import { formatQuota } from '@/lib/format'
-import { useSystemConfig } from '@/hooks/use-system-config'
+
+import { GroupBadge } from '@/components/group-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,7 +39,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { GroupBadge } from '@/components/group-badge'
+import { useSystemConfig } from '@/hooks/use-system-config'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
+import { formatQuota } from '@/lib/format'
+import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
+
 import {
   paySubscriptionStripe,
   paySubscriptionCreem,
@@ -112,7 +114,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
       (m) => !m.type?.startsWith('alipay_') && !m.type?.startsWith('wxpay_')
     )
   const hasAnyPayment =
-    hasStripe || hasCreem || hasWaffoPancake || hasEpay || hasAlipay || hasWechat
+    hasStripe ||
+    hasCreem ||
+    hasWaffoPancake ||
+    hasEpay ||
+    hasAlipay ||
+    hasWechat
   const selectedEpayMethodLabel =
     (props.epayMethods || []).find((m) => m.type === selectedEpayMethod)
       ?.name ||
@@ -284,7 +291,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
         plan_id: plan.id,
         payment_method: wechatMethod.type,
       })
-      if (res.message === 'success' && (res.data?.h5_url || res.data?.code_url)) {
+      if (
+        res.message === 'success' &&
+        (res.data?.h5_url || res.data?.code_url)
+      ) {
         window.open(res.data.h5_url || res.data.code_url, '_blank')
         toast.success(t('Payment page opened'))
         props.onOpenChange(false)
@@ -426,7 +436,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
               variant='outline'
               onClick={handlePayBalance}
               disabled={
-                paying || limitReached || !allowBalancePay || insufficientBalance
+                paying ||
+                limitReached ||
+                !allowBalancePay ||
+                insufficientBalance
               }
             >
               {t('Pay with Balance')}
@@ -500,10 +513,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
                 <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
                   <Select
                     items={[
-                      ...(props.epayMethods || []).filter((m) => !m.type?.startsWith('alipay_') && !m.type?.startsWith('wxpay_')).map((m) => ({
-                        value: m.type,
-                        label: m.name || m.type,
-                      })),
+                      ...(props.epayMethods || [])
+                        .filter(
+                          (m) =>
+                            !m.type?.startsWith('alipay_') &&
+                            !m.type?.startsWith('wxpay_')
+                        )
+                        .map((m) => ({
+                          value: m.type,
+                          label: m.name || m.type,
+                        })),
                     ]}
                     value={selectedEpayMethod}
                     onValueChange={(v) =>
@@ -516,11 +535,17 @@ export function SubscriptionPurchaseDialog(props: Props) {
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectGroup>
-                        {(props.epayMethods || []).filter((m) => !m.type?.startsWith('alipay_') && !m.type?.startsWith('wxpay_')).map((m) => (
-                          <SelectItem key={m.type} value={m.type}>
-                            {m.name || m.type}
-                          </SelectItem>
-                        ))}
+                        {(props.epayMethods || [])
+                          .filter(
+                            (m) =>
+                              !m.type?.startsWith('alipay_') &&
+                              !m.type?.startsWith('wxpay_')
+                          )
+                          .map((m) => (
+                            <SelectItem key={m.type} value={m.type}>
+                              {m.name || m.type}
+                            </SelectItem>
+                          ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>

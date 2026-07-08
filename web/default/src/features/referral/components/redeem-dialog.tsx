@@ -51,7 +51,7 @@ export function RedeemDialog({ open, maxCents, onOpenChange }: Props) {
             onChange={(e) => setYuan(e.target.value)}
           />
           {preview.data && (
-            <div className='rounded-md bg-muted p-3 text-sm'>
+            <div className='bg-muted rounded-md p-3 text-sm'>
               <div>
                 {t('Current rate')}: 1 USD ≈{' '}
                 {preview.data.usd_exchange_rate.toFixed(4)} CNY

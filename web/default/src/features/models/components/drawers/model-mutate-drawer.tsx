@@ -16,22 +16,26 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import * as z from 'zod'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useSystemConfig } from '@/hooks/use-system-config'
+import * as z from 'zod'
+
 import {
-  convertBillingDisplayToUSD,
-  convertUSDToBillingDisplay,
-  formatBillingCurrencyFromUSD,
-} from '@/lib/currency'
-import { getLobeIcon } from '@/lib/lobe-icon'
-import { cn } from '@/lib/utils'
+  SideDrawerSection,
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+  sideDrawerFormClassName,
+  sideDrawerHeaderClassName,
+  sideDrawerSwitchItemClassName,
+} from '@/components/drawer-layout'
+import { IconSelector } from '@/components/icon-selector'
+import { JsonEditor } from '@/components/json-editor'
+import { TagInput } from '@/components/tag-input'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -70,16 +74,6 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  SideDrawerSection,
-  sideDrawerContentClassName,
-  sideDrawerFooterClassName,
-  sideDrawerFormClassName,
-  sideDrawerHeaderClassName,
-  sideDrawerSwitchItemClassName,
-} from '@/components/drawer-layout'
-import { JsonEditor } from '@/components/json-editor'
-import { TagInput } from '@/components/tag-input'
-import {
   useSystemOptions,
   getOptionValue,
 } from '@/features/system-settings/hooks/use-system-options'
@@ -87,10 +81,31 @@ import { useUpdateOption } from '@/features/system-settings/hooks/use-update-opt
 import { normalizeJsonString } from '@/features/system-settings/models/utils'
 import type { ModelSettings } from '@/features/system-settings/types'
 import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
-import { createModel, updateModel, getModel, getVendors, getModels } from '../../api'
-import { getNameRuleOptions, ENDPOINT_TEMPLATES, TAG_PRESETS, getTagLabel, getTagCategoryLabel, CAPABILITY_ENDPOINT_HINTS } from '../../constants'
+import { useSystemConfig } from '@/hooks/use-system-config'
+import {
+  convertBillingDisplayToUSD,
+  convertUSDToBillingDisplay,
+  formatBillingCurrencyFromUSD,
+} from '@/lib/currency'
+import { getLobeIcon } from '@/lib/lobe-icon'
+import { cn } from '@/lib/utils'
+
+import {
+  createModel,
+  updateModel,
+  getModel,
+  getVendors,
+  getModels,
+} from '../../api'
+import {
+  getNameRuleOptions,
+  ENDPOINT_TEMPLATES,
+  TAG_PRESETS,
+  getTagLabel,
+  getTagCategoryLabel,
+  CAPABILITY_ENDPOINT_HINTS,
+} from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
-import { inferVendorName } from '../../lib/vendor-inference'
 import {
   getCompletionPriceLabelKey,
   getFixedPriceLabelKey,
@@ -98,8 +113,8 @@ import {
   getPricingModeLabelKey,
   getPromptPriceLabelKey,
 } from '../../lib/pricing-currency-label'
+import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
-import { IconSelector } from '@/components/icon-selector'
 import { OfficialPricingReference } from '../pricing/official-pricing-reference'
 
 // Extended schema for ratio configuration (internal form state only)
@@ -411,15 +426,10 @@ export function ModelMutateDrawer({
       }
       if (payload.ratio !== undefined) {
         form.setValue('ratio', payload.ratio.toString())
-        const inputPriceDisplay = convertUSDToBillingDisplay(
-          payload.ratio * 2
-        )
+        const inputPriceDisplay = convertUSDToBillingDisplay(payload.ratio * 2)
         setPromptPrice(inputPriceDisplay.toString())
         if (payload.completionRatio !== undefined) {
-          form.setValue(
-            'completionRatio',
-            payload.completionRatio.toString()
-          )
+          form.setValue('completionRatio', payload.completionRatio.toString())
           setCompletionPrice(
             (inputPriceDisplay * payload.completionRatio).toString()
           )
@@ -864,20 +874,20 @@ export function ModelMutateDrawer({
 
         <Form {...form}>
           <form
-            id="model-form"
+            id='model-form'
             onSubmit={form.handleSubmit(
               onSubmit as Parameters<typeof form.handleSubmit>[0]
             )}
             className={sideDrawerFormClassName()}
           >
             <SideDrawerSection>
-              <h3 className="text-sm font-semibold">
+              <h3 className='text-sm font-semibold'>
                 {t('Basic Information')}
               </h3>
 
               <FormField
                 control={form.control}
-                name="model_name"
+                name='model_name'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Model Name *')}</FormLabel>
@@ -897,7 +907,7 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="description"
+                name='description'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Description')}</FormLabel>
@@ -915,7 +925,7 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="icon"
+                name='icon'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Icon')}</FormLabel>
@@ -926,7 +936,7 @@ export function ModelMutateDrawer({
                         placeholder={t('Select or upload icon')}
                       />
                     </FormControl>
-                    <FormDescription className="text-xs">
+                    <FormDescription className='text-xs'>
                       {t('Select from @lobehub/icons or upload custom')}
                     </FormDescription>
                     <FormMessage />
@@ -936,14 +946,14 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="vendor_id"
+                name='vendor_id'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-2">
+                    <FormLabel className='flex items-center gap-2'>
                       {t('Vendor')}
                       {autoMatchedVendorId &&
                         field.value === autoMatchedVendorId && (
-                          <span className="text-xs text-primary font-medium">
+                          <span className='text-primary text-xs font-medium'>
                             {t('Auto-matched')}
                           </span>
                         )}
@@ -997,31 +1007,31 @@ export function ModelMutateDrawer({
                                 key={vendor.id}
                                 value={String(vendor.id)}
                               >
-                                <div className="flex items-center gap-2">
+                                <div className='flex items-center gap-2'>
                                   {vendor.icon && (
-                                    <span className="flex items-center">
+                                    <span className='flex items-center'>
                                       {getLobeIcon(vendor.icon, 14)}
                                     </span>
                                   )}
-                                  <div className="flex flex-col items-start">
-                                    <div className="flex items-center gap-1">
+                                  <div className='flex flex-col items-start'>
+                                    <div className='flex items-center gap-1'>
                                       {vendor.display_name || vendor.name}
                                       {isRecommended && (
-                                        <span className="text-primary text-xs font-medium">
+                                        <span className='text-primary text-xs font-medium'>
                                           ★
                                         </span>
                                       )}
                                     </div>
                                     {(vendor.display_name ||
                                       modelCount > 0) && (
-                                      <div className="flex items-center gap-1">
+                                      <div className='flex items-center gap-1'>
                                         {vendor.display_name && (
-                                          <span className="text-muted-foreground text-xs">
+                                          <span className='text-muted-foreground text-xs'>
                                             {vendor.name}
                                           </span>
                                         )}
                                         {modelCount > 0 && (
-                                          <span className="text-muted-foreground text-xs">
+                                          <span className='text-muted-foreground text-xs'>
                                             ({modelCount} {t('models')})
                                           </span>
                                         )}
@@ -1042,7 +1052,7 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="tags"
+                name='tags'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Tags')}</FormLabel>
@@ -1053,19 +1063,19 @@ export function ModelMutateDrawer({
                         placeholder={t('Add tags...')}
                       />
                     </FormControl>
-                    <div className="mt-2 space-y-2">
+                    <div className='mt-2 space-y-2'>
                       {TAG_PRESETS.map((category) => (
-                        <div key={category.category} className="space-y-1">
-                          <p className="text-muted-foreground text-xs font-medium">
+                        <div key={category.category} className='space-y-1'>
+                          <p className='text-muted-foreground text-xs font-medium'>
                             {getTagCategoryLabel(t, category.category)}
                           </p>
-                          <div className="flex flex-wrap gap-1">
+                          <div className='flex flex-wrap gap-1'>
                             {category.tags.map((tag) => {
                               const isSelected = field.value?.includes(tag)
                               return (
                                 <button
                                   key={tag}
-                                  type="button"
+                                  type='button'
                                   onClick={() => {
                                     const currentTags = field.value || []
                                     const newTags = isSelected
@@ -1088,8 +1098,10 @@ export function ModelMutateDrawer({
                         </div>
                       ))}
                     </div>
-                    <FormDescription className="mt-2">
-                      {t('Press Enter or comma to add tags, or click tags below to add')}
+                    <FormDescription className='mt-2'>
+                      {t(
+                        'Press Enter or comma to add tags, or click tags below to add'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1098,14 +1110,14 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="context_length"
+                name='context_length'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Context window')}</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        placeholder="128000"
+                        type='number'
+                        placeholder='128000'
                         value={field.value ?? ''}
                         onChange={(e) => {
                           const v = e.target.value
@@ -1114,7 +1126,9 @@ export function ModelMutateDrawer({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Maximum context tokens supported by this model (e.g. 128000).')}
+                      {t(
+                        'Maximum context tokens supported by this model (e.g. 128000).'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1123,11 +1137,11 @@ export function ModelMutateDrawer({
             </SideDrawerSection>
 
             <SideDrawerSection>
-              <h3 className="text-sm font-semibold">{t('Matching Rules')}</h3>
+              <h3 className='text-sm font-semibold'>{t('Matching Rules')}</h3>
 
               <FormField
                 control={form.control}
-                name="name_rule"
+                name='name_rule'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Name Rule')}</FormLabel>
@@ -1137,12 +1151,12 @@ export function ModelMutateDrawer({
                           field.onChange(parseInt(value))
                         }
                         value={String(field.value)}
-                        className="grid grid-cols-2 gap-4"
+                        className='grid grid-cols-2 gap-4'
                       >
                         {getNameRuleOptions(t).map((option) => (
                           <div
                             key={option.value}
-                            className="flex items-center space-x-2"
+                            className='flex items-center space-x-2'
                           >
                             <RadioGroupItem
                               value={String(option.value)}
@@ -1150,7 +1164,7 @@ export function ModelMutateDrawer({
                             />
                             <Label
                               htmlFor={`rule-${option.value}`}
-                              className="cursor-pointer font-normal"
+                              className='cursor-pointer font-normal'
                             >
                               {option.label}
                             </Label>
@@ -1168,36 +1182,40 @@ export function ModelMutateDrawer({
             </SideDrawerSection>
 
             <SideDrawerSection>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{t('Endpoints')}</h3>
+              <div className='flex items-center justify-between'>
+                <h3 className='text-sm font-semibold'>{t('Endpoints')}</h3>
                 <Select<string>
                   items={[
-                    ...Object.entries(ENDPOINT_TEMPLATES).map(([key, _template]) => ({
-                      value: key,
-                      label: key,
-                    })),
+                    ...Object.entries(ENDPOINT_TEMPLATES).map(
+                      ([key, _template]) => ({
+                        value: key,
+                        label: key,
+                      })
+                    ),
                   ]}
                   onValueChange={(value) =>
                     value !== null && handleFillEndpointTemplate(value)
                   }
                 >
-                  <SelectTrigger size="sm" className="w-[200px]">
+                  <SelectTrigger size='sm' className='w-[200px]'>
                     <SelectValue placeholder={t('Load template...')} />
                   </SelectTrigger>
                   <SelectContent alignItemWithTrigger={false}>
                     <SelectGroup>
-                      {Object.entries(ENDPOINT_TEMPLATES).map(([key, template]) => (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex flex-col">
-                            <span>{key}</span>
-                            {template.description && (
-                              <span className="text-muted-foreground text-xs">
-                                {template.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {Object.entries(ENDPOINT_TEMPLATES).map(
+                        ([key, template]) => (
+                          <SelectItem key={key} value={key}>
+                            <div className='flex flex-col'>
+                              <span>{key}</span>
+                              {template.description && (
+                                <span className='text-muted-foreground text-xs'>
+                                  {template.description}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        )
+                      )}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -1205,7 +1223,7 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="endpoints"
+                name='endpoints'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('Endpoint Configuration')}</FormLabel>
@@ -1213,7 +1231,7 @@ export function ModelMutateDrawer({
                       <JsonEditor
                         value={field.value || ''}
                         onChange={field.onChange}
-                        keyPlaceholder="endpoint_type (e.g., chat, completions)"
+                        keyPlaceholder='endpoint_type (e.g., chat, completions)'
                         valuePlaceholder='{"path": "/v1/...", "method": "POST"}'
                         keyLabel='Endpoint Type'
                         valueLabel='Configuration'
@@ -1223,12 +1241,12 @@ export function ModelMutateDrawer({
                         )}
                       />
                     </FormControl>
-                    <div className="mt-2 space-y-2 rounded-lg border border-border bg-card/50 p-3">
-                      <p className="text-muted-foreground text-xs font-medium">
+                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
+                      <p className='text-muted-foreground text-xs font-medium'>
                         {t('Configuration Format')}
                       </p>
-                      <pre className="text-muted-foreground overflow-x-auto text-xs">
-{`{
+                      <pre className='text-muted-foreground overflow-x-auto text-xs'>
+                        {`{
   "chat": {
     "path": "/v1/chat/completions",
     "method": "POST"
@@ -1240,31 +1258,33 @@ export function ModelMutateDrawer({
 }`}
                       </pre>
                     </div>
-                    <div className="mt-2 space-y-2 rounded-lg border border-border bg-card/50 p-3">
-                      <p className="text-muted-foreground text-xs font-medium">
+                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
+                      <p className='text-muted-foreground text-xs font-medium'>
                         {t('Capability → Endpoint reference')}
                       </p>
-                      <div className="flex flex-col gap-1.5">
+                      <div className='flex flex-col gap-1.5'>
                         {CAPABILITY_ENDPOINT_HINTS.map((hint) => (
                           <div
                             key={hint.capability}
-                            className="flex items-center justify-between gap-2"
+                            className='flex items-center justify-between gap-2'
                           >
-                            <div className="flex flex-col">
-                              <span className="text-foreground text-xs font-medium">
+                            <div className='flex flex-col'>
+                              <span className='text-foreground text-xs font-medium'>
                                 {getTagLabel(t, hint.capability)}
                               </span>
-                              <span className="text-muted-foreground text-[11px]">
+                              <span className='text-muted-foreground text-[11px]'>
                                 {t(hint.descriptionKey)}
                               </span>
                             </div>
-                            <div className="flex flex-wrap gap-1">
+                            <div className='flex flex-wrap gap-1'>
                               {hint.templateKeys.map((key) => (
                                 <button
                                   key={key}
-                                  type="button"
-                                  onClick={() => handleFillEndpointTemplate(key)}
-                                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                                  type='button'
+                                  onClick={() =>
+                                    handleFillEndpointTemplate(key)
+                                  }
+                                  className='border-border text-muted-foreground hover:border-primary hover:text-primary rounded-full border px-2 py-0.5 text-[11px] transition-colors'
                                 >
                                   {key}
                                 </button>
@@ -1275,7 +1295,9 @@ export function ModelMutateDrawer({
                       </div>
                     </div>
                     <FormDescription>
-                      {t('Define API endpoints for this model. Each endpoint type maps to a path and HTTP method.')}
+                      {t(
+                        'Define API endpoints for this model. Each endpoint type maps to a path and HTTP method.'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1284,7 +1306,7 @@ export function ModelMutateDrawer({
             </SideDrawerSection>
 
             <SideDrawerSection>
-              <h3 className="text-sm font-semibold">
+              <h3 className='text-sm font-semibold'>
                 {t('Pricing Configuration')}
               </h3>
 
@@ -1303,7 +1325,7 @@ export function ModelMutateDrawer({
                 onApply={applyOfficialPricing}
               />
 
-              <div className="space-y-4">
+              <div className='space-y-4'>
                 <Label>{t('Pricing mode')}</Label>
                 <RadioGroup
                   value={pricingMode}
@@ -1311,15 +1333,15 @@ export function ModelMutateDrawer({
                     setPricingMode(value as PricingMode)
                   }
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="per-token" id="per-token" />
-                    <Label htmlFor="per-token" className="font-normal">
+                  <div className='flex items-center space-x-2'>
+                    <RadioGroupItem value='per-token' id='per-token' />
+                    <Label htmlFor='per-token' className='font-normal'>
                       {t('Per-token (ratio based)')}
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="per-request" id="per-request" />
-                    <Label htmlFor="per-request" className="font-normal">
+                  <div className='flex items-center space-x-2'>
+                    <RadioGroupItem value='per-request' id='per-request' />
+                    <Label htmlFor='per-request' className='font-normal'>
                       {t('Per-request (fixed price)')}
                     </Label>
                   </div>
@@ -1329,7 +1351,7 @@ export function ModelMutateDrawer({
               {pricingMode === 'per-request' ? (
                 <FormField
                   control={form.control}
-                  name="price"
+                  name='price'
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
@@ -1339,8 +1361,8 @@ export function ModelMutateDrawer({
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="text"
-                          placeholder="0.01"
+                          type='text'
+                          placeholder='0.01'
                           {...field}
                           onChange={(e) => {
                             const value = e.target.value
@@ -1353,7 +1375,9 @@ export function ModelMutateDrawer({
                       <FormDescription>
                         {field.value && !isNaN(parseFloat(field.value))
                           ? formatRequestPriceRule(
-                              convertBillingDisplayToUSD(parseFloat(field.value))
+                              convertBillingDisplayToUSD(
+                                parseFloat(field.value)
+                              )
                             )
                           : t(
                               'Enter price in {{currency}} per request; stored as base USD after conversion.',
@@ -1366,7 +1390,7 @@ export function ModelMutateDrawer({
                 />
               ) : (
                 <>
-                  <div className="space-y-4">
+                  <div className='space-y-4'>
                     <Label>{t('Input mode')}</Label>
                     <RadioGroup
                       value={pricingSubMode}
@@ -1374,15 +1398,15 @@ export function ModelMutateDrawer({
                         setPricingSubMode(value as PricingSubMode)
                       }
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="ratio" id="ratio" />
-                        <Label htmlFor="ratio" className="font-normal">
+                      <div className='flex items-center space-x-2'>
+                        <RadioGroupItem value='ratio' id='ratio' />
+                        <Label htmlFor='ratio' className='font-normal'>
                           {t('Ratio mode')}
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="price" id="price" />
-                        <Label htmlFor="price" className="font-normal">
+                      <div className='flex items-center space-x-2'>
+                        <RadioGroupItem value='price' id='price' />
+                        <Label htmlFor='price' className='font-normal'>
                           {t(getPricingModeLabelKey(pricingDisplayType), {
                             currency: pricingCurrencyLabel,
                           })}
@@ -1395,14 +1419,14 @@ export function ModelMutateDrawer({
                     <>
                       <FormField
                         control={form.control}
-                        name="ratio"
+                        name='ratio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Model ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="1.0"
+                                type='text'
+                                placeholder='1.0'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1427,7 +1451,9 @@ export function ModelMutateDrawer({
                             </FormControl>
                             <FormDescription>
                               {field.value && !isNaN(parseFloat(field.value))
-                                ? formatModelPriceRule(parseFloat(field.value) * 2)
+                                ? formatModelPriceRule(
+                                    parseFloat(field.value) * 2
+                                  )
                                 : t('Multiplier for prompt tokens.')}
                             </FormDescription>
                             <FormMessage />
@@ -1437,14 +1463,14 @@ export function ModelMutateDrawer({
 
                       <FormField
                         control={form.control}
-                        name="completionRatio"
+                        name='completionRatio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Completion ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="1.0"
+                                type='text'
+                                placeholder='1.0'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1473,9 +1499,9 @@ export function ModelMutateDrawer({
                             </FormControl>
                             <FormDescription>
                               {field.value &&
-                                !isNaN(parseFloat(field.value)) &&
-                                form.getValues('ratio') &&
-                                !isNaN(parseFloat(form.getValues('ratio') || ''))
+                              !isNaN(parseFloat(field.value)) &&
+                              form.getValues('ratio') &&
+                              !isNaN(parseFloat(form.getValues('ratio') || ''))
                                 ? formatModelPriceRule(
                                     parseFloat(form.getValues('ratio') || '0') *
                                       2 *
@@ -1490,22 +1516,22 @@ export function ModelMutateDrawer({
                     </>
                   ) : (
                     <>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
+                      <div className='space-y-4'>
+                        <div className='space-y-2'>
                           <Label>
                             {t(getPromptPriceLabelKey(pricingDisplayType), {
                               currency: pricingCurrencyLabel,
                             })}
                           </Label>
                           <Input
-                            type="text"
-                            placeholder="2.0"
+                            type='text'
+                            placeholder='2.0'
                             value={promptPrice}
                             onChange={(e) =>
                               handlePromptPriceChange(e.target.value)
                             }
                           />
-                          <p className="text-muted-foreground text-sm">
+                          <p className='text-muted-foreground text-sm'>
                             {promptPrice && !isNaN(parseFloat(promptPrice))
                               ? t(
                                   'Calculated ratio: {{ratio}} (stored as base USD)',
@@ -1524,26 +1550,26 @@ export function ModelMutateDrawer({
                           </p>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className='space-y-2'>
                           <Label>
                             {t(getCompletionPriceLabelKey(pricingDisplayType), {
                               currency: pricingCurrencyLabel,
                             })}
                           </Label>
                           <Input
-                            type="text"
-                            placeholder="4.0"
+                            type='text'
+                            placeholder='4.0'
                             value={completionPrice}
                             onChange={(e) =>
                               handleCompletionPriceChange(e.target.value)
                             }
                           />
-                          <p className="text-muted-foreground text-sm">
+                          <p className='text-muted-foreground text-sm'>
                             {completionPrice &&
-                              !isNaN(parseFloat(completionPrice)) &&
-                              promptPrice &&
-                              !isNaN(parseFloat(promptPrice)) &&
-                              parseFloat(promptPrice) > 0
+                            !isNaN(parseFloat(completionPrice)) &&
+                            promptPrice &&
+                            !isNaN(parseFloat(promptPrice)) &&
+                            parseFloat(promptPrice) > 0
                               ? t(
                                   'Calculated ratio: {{ratio}} (stored as base USD)',
                                   {
@@ -1570,9 +1596,9 @@ export function ModelMutateDrawer({
                     <CollapsibleTrigger
                       render={
                         <Button
-                          type="button"
-                          variant="outline"
-                          className="flex w-full items-center justify-between"
+                          type='button'
+                          variant='outline'
+                          className='flex w-full items-center justify-between'
                         />
                       }
                     >
@@ -1583,17 +1609,17 @@ export function ModelMutateDrawer({
                         }`}
                       />
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="flex flex-col gap-4 pt-4">
+                    <CollapsibleContent className='flex flex-col gap-4 pt-4'>
                       <FormField
                         control={form.control}
-                        name="cacheRatio"
+                        name='cacheRatio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Cache ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="0.1"
+                                type='text'
+                                placeholder='0.1'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1613,14 +1639,14 @@ export function ModelMutateDrawer({
 
                       <FormField
                         control={form.control}
-                        name="imageRatio"
+                        name='imageRatio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Image ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="1.0"
+                                type='text'
+                                placeholder='1.0'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1640,14 +1666,14 @@ export function ModelMutateDrawer({
 
                       <FormField
                         control={form.control}
-                        name="audioRatio"
+                        name='audioRatio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Audio ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="1.0"
+                                type='text'
+                                placeholder='1.0'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1667,14 +1693,14 @@ export function ModelMutateDrawer({
 
                       <FormField
                         control={form.control}
-                        name="audioCompletionRatio"
+                        name='audioCompletionRatio'
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t('Audio completion ratio')}</FormLabel>
                             <FormControl>
                               <Input
-                                type="text"
-                                placeholder="1.0"
+                                type='text'
+                                placeholder='1.0'
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value
@@ -1698,15 +1724,15 @@ export function ModelMutateDrawer({
             </SideDrawerSection>
 
             <SideDrawerSection>
-              <h3 className="text-sm font-semibold">{t('Status & Sync')}</h3>
+              <h3 className='text-sm font-semibold'>{t('Status & Sync')}</h3>
 
               <FormField
                 control={form.control}
-                name="status"
+                name='status'
                 render={({ field }) => (
                   <FormItem className={sideDrawerSwitchItemClassName()}>
-                    <div className="flex flex-col gap-0.5">
-                      <FormLabel className="text-base">
+                    <div className='flex flex-col gap-0.5'>
+                      <FormLabel className='text-base'>
                         {t('Enabled')}
                       </FormLabel>
                       <FormDescription>
@@ -1725,11 +1751,11 @@ export function ModelMutateDrawer({
 
               <FormField
                 control={form.control}
-                name="sync_official"
+                name='sync_official'
                 render={({ field }) => (
                   <FormItem className={sideDrawerSwitchItemClassName()}>
-                    <div className="flex flex-col gap-0.5">
-                      <FormLabel className="text-base">
+                    <div className='flex flex-col gap-0.5'>
+                      <FormLabel className='text-base'>
                         {t('Official Sync')}
                       </FormLabel>
                       <FormDescription>
@@ -1753,12 +1779,12 @@ export function ModelMutateDrawer({
 
         <SheetFooter className={sideDrawerFooterClassName()}>
           <SheetClose
-            render={<Button variant="outline" disabled={isSubmitting} />}
+            render={<Button variant='outline' disabled={isSubmitting} />}
           >
             {t('Cancel')}
           </SheetClose>
-          <Button form="model-form" type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button form='model-form' type='submit' disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             {isEditing ? t('Update Model') : t('Save changes')}
           </Button>
         </SheetFooter>

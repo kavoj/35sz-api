@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import dayjs from '@/lib/dayjs'
+
 import {
   formatCurrencyFromUSD,
   formatQuotaWithCurrency,
@@ -113,7 +114,7 @@ export function quotaUnitsToDollars(units: number): number {
     meta.kind === 'currency' || meta.kind === 'custom' ? meta.exchangeRate : 1
 
   // Round to 4 decimal places to avoid floating point precision issues
-  return Math.round((usdAmount * exchangeRate) * 10000) / 10000
+  return Math.round(usdAmount * exchangeRate * 10000) / 10000
 }
 
 // ============================================================================

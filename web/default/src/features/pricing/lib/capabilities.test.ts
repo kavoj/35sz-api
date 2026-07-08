@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { matchesCapabilityTab, CAPABILITY_TABS } from './capabilities'
+
 import type { PricingModel } from '../types'
+import { matchesCapabilityTab, CAPABILITY_TABS } from './capabilities'
 
 function model(tags: string): PricingModel {
   return {

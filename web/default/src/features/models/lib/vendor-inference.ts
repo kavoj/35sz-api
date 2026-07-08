@@ -126,7 +126,9 @@ const SORTED_NAME_PATTERNS = Object.entries(NAME_PATTERN_TO_VENDOR_NAME).sort(
  * 根据图标 key 推断 vendor.name。
  * 支持 `.Color` 后缀差异（如 `Doubao` 与 `Doubao.Color` 都能命中）。
  */
-export function inferVendorNameByIcon(icon: string | undefined): string | undefined {
+export function inferVendorNameByIcon(
+  icon: string | undefined
+): string | undefined {
   if (!icon) return undefined
   if (ICON_TO_VENDOR_NAME[icon]) return ICON_TO_VENDOR_NAME[icon]
   // 去后缀重试
@@ -138,7 +140,9 @@ export function inferVendorNameByIcon(icon: string | undefined): string | undefi
 /**
  * 根据模型名推断 vendor.name。按 pattern 长度降序找第一命中。
  */
-export function inferVendorNameByModelName(modelName: string | undefined): string | undefined {
+export function inferVendorNameByModelName(
+  modelName: string | undefined
+): string | undefined {
   if (!modelName) return undefined
   const lower = modelName.toLowerCase()
   for (const [pattern, vendor] of SORTED_NAME_PATTERNS) {
@@ -155,5 +159,8 @@ export function inferVendorName(input: {
   icon?: string
   modelName?: string
 }): string | undefined {
-  return inferVendorNameByIcon(input.icon) ?? inferVendorNameByModelName(input.modelName)
+  return (
+    inferVendorNameByIcon(input.icon) ??
+    inferVendorNameByModelName(input.modelName)
+  )
 }

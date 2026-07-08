@@ -16,19 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatQuota } from '@/lib/format'
+
 import { DataTableColumnHeader } from '@/components/data-table'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
+import { formatQuota } from '@/lib/format'
+
 import { formatDuration, formatResetPeriod } from '../lib'
 import { formatSubscriptionPlanPrice } from '../lib/subscription-price-format'
-import { useSubscriptions } from './subscriptions-provider'
 import type { PlanRecord } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
+import { useSubscriptions } from './subscriptions-provider'
 
 export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
   const { t } = useTranslation()
@@ -156,28 +158,43 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
           const showNative = plan.price_amount > 0
           return (
             <div className='flex gap-1'>
-              {plan.stripe_price_id && subscriptionPaymentAvailability.stripe && (
-                <StatusBadge
-                  label='Stripe'
-                  variant='neutral'
-                  copyable={false}
-                />
-              )}
-              {plan.creem_product_id && subscriptionPaymentAvailability.creem && (
-                <StatusBadge label='Creem' variant='neutral' copyable={false} />
-              )}
-              {plan.waffo_pancake_product_id && subscriptionPaymentAvailability.waffoPancake && (
-                <StatusBadge
-                  label='Waffo Pancake'
-                  variant='neutral'
-                  copyable={false}
-                />
-              )}
+              {plan.stripe_price_id &&
+                subscriptionPaymentAvailability.stripe && (
+                  <StatusBadge
+                    label='Stripe'
+                    variant='neutral'
+                    copyable={false}
+                  />
+                )}
+              {plan.creem_product_id &&
+                subscriptionPaymentAvailability.creem && (
+                  <StatusBadge
+                    label='Creem'
+                    variant='neutral'
+                    copyable={false}
+                  />
+                )}
+              {plan.waffo_pancake_product_id &&
+                subscriptionPaymentAvailability.waffoPancake && (
+                  <StatusBadge
+                    label='Waffo Pancake'
+                    variant='neutral'
+                    copyable={false}
+                  />
+                )}
               {showNative && subscriptionPaymentAvailability.alipay && (
-                <StatusBadge label='Alipay' variant='neutral' copyable={false} />
+                <StatusBadge
+                  label='Alipay'
+                  variant='neutral'
+                  copyable={false}
+                />
               )}
               {showNative && subscriptionPaymentAvailability.wechat && (
-                <StatusBadge label='WeChat Pay' variant='neutral' copyable={false} />
+                <StatusBadge
+                  label='WeChat Pay'
+                  variant='neutral'
+                  copyable={false}
+                />
               )}
               {showNative && subscriptionPaymentAvailability.epay && (
                 <StatusBadge label='Epay' variant='neutral' copyable={false} />

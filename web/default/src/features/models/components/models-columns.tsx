@@ -18,8 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
-import { formatTimestampToDate } from '@/lib/format'
-import { getLobeIcon } from '@/lib/lobe-icon'
+
+import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
+import { GroupBadge } from '@/components/group-badge'
+import { StatusBadge, StatusBadgeList } from '@/components/status-badge'
+import { TableId } from '@/components/table-id'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Tooltip,
@@ -27,16 +30,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
-import { GroupBadge } from '@/components/group-badge'
-import { StatusBadge, StatusBadgeList } from '@/components/status-badge'
-import { TableId } from '@/components/table-id'
+import { formatTimestampToDate } from '@/lib/format'
+import { getLobeIcon } from '@/lib/lobe-icon'
+
 import {
   getModelStatusConfig,
   getNameRuleConfig,
   getQuotaTypeConfig,
 } from '../constants'
-import { parseModelTags, formatEndpointsDisplay, getTranslatedTags } from '../lib'
+import {
+  parseModelTags,
+  formatEndpointsDisplay,
+  getTranslatedTags,
+} from '../lib'
 import type { Model, Vendor } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DescriptionCell } from './description-cell'
@@ -325,7 +331,12 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
         }
 
         const tagBadges = tagArray.map((tag, idx) => (
-          <StatusBadge key={idx} label={translatedTags[idx]} autoColor={tag} size='sm' />
+          <StatusBadge
+            key={idx}
+            label={translatedTags[idx]}
+            autoColor={tag}
+            size='sm'
+          />
         ))
 
         return (

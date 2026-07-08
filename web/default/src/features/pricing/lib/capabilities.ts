@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { parseTags } from './filters'
 import type { PricingModel } from '../types'
+import { parseTags } from './filters'
 
 export type CapabilityTabValue =
   | 'all'

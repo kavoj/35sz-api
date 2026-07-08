@@ -40,7 +40,7 @@ export function yuanToCents(yuan: number): number {
 export function computeQuotaCredit(
   cents: number,
   rate: number,
-  quotaPerUnit: number,
+  quotaPerUnit: number
 ): number {
   if (cents <= 0 || rate <= 0 || quotaPerUnit <= 0) return 0
   return Math.floor((cents / 100 / rate) * quotaPerUnit)

@@ -66,7 +66,10 @@ export function DownlinesTable() {
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={4} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={4}
+                className='text-muted-foreground text-center'
+              >
                 {t('Loading…')}
               </TableCell>
             </TableRow>
@@ -82,14 +85,17 @@ export function DownlinesTable() {
             ))}
           {!isLoading && (data?.rows.length ?? 0) === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className='text-center text-muted-foreground'>
+              <TableCell
+                colSpan={4}
+                className='text-muted-foreground text-center'
+              >
                 {t('No data')}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-      <div className='flex items-center justify-between text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex items-center justify-between text-sm'>
         <span>
           {t('Page')} {page} / {totalPages}
         </span>

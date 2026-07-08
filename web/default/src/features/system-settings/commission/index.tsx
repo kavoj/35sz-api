@@ -2,8 +2,8 @@
 Copyright (C) 2023-2026 QuantumNous
 ...
 */
-import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -36,10 +36,7 @@ import {
   updateRule,
   voidRecord,
 } from './api'
-import type {
-  AdminCommissionRecord,
-  CommissionRule,
-} from './types'
+import type { AdminCommissionRecord, CommissionRule } from './types'
 
 const PAGE_SIZE = 20
 
@@ -57,7 +54,10 @@ function centsToYuan(c: number) {
 function RulesSection() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const rules = useQuery({ queryKey: ['commission-admin', 'rules'], queryFn: getRules })
+  const rules = useQuery({
+    queryKey: ['commission-admin', 'rules'],
+    queryFn: getRules,
+  })
   const settle = useMutation({
     mutationFn: settleNow,
     onSuccess: (d) => {
@@ -160,7 +160,11 @@ function RuleRow({ rule }: { rule: CommissionRule }) {
         />
       </TableCell>
       <TableCell>
-        <Button size='sm' onClick={() => patch.mutate()} disabled={patch.isPending}>
+        <Button
+          size='sm'
+          onClick={() => patch.mutate()}
+          disabled={patch.isPending}
+        >
           {t('Save')}
         </Button>
       </TableCell>
@@ -174,12 +178,16 @@ function RecordsSection() {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<string>('')
-  const [voidTarget, setVoidTarget] = useState<AdminCommissionRecord | null>(null)
+  const [voidTarget, setVoidTarget] = useState<AdminCommissionRecord | null>(
+    null
+  )
   const data = useQuery({
     queryKey: ['commission-admin', 'records', page, status],
     queryFn: () => listRecords({ page, size: PAGE_SIZE, status }),
   })
-  const totalPages = data.data ? Math.max(1, Math.ceil(data.data.total / PAGE_SIZE)) : 1
+  const totalPages = data.data
+    ? Math.max(1, Math.ceil(data.data.total / PAGE_SIZE))
+    : 1
 
   return (
     <Card>
@@ -254,15 +262,25 @@ function RecordsSection() {
             ))}
           </TableBody>
         </Table>
-        <div className='flex justify-between text-sm text-muted-foreground'>
+        <div className='text-muted-foreground flex justify-between text-sm'>
           <span>
             {t('Page')} {page} / {totalPages}
           </span>
           <div className='flex gap-2'>
-            <Button variant='outline' size='sm' disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
               {t('Previous')}
             </Button>
-            <Button variant='outline' size='sm' disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            <Button
+              variant='outline'
+              size='sm'
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
               {t('Next')}
             </Button>
           </div>
@@ -306,9 +324,12 @@ function VoidDialog({
         </DialogHeader>
         <div className='space-y-3'>
           <div className='text-sm'>
-            {t('Commission')}: ¥{centsToYuan(target?.commission_amount_cents ?? 0)}
+            {t('Commission')}: ¥
+            {centsToYuan(target?.commission_amount_cents ?? 0)}
           </div>
-          <div className='text-sm'>{t('Status')}: {target?.status && t(target.status)}</div>
+          <div className='text-sm'>
+            {t('Status')}: {target?.status && t(target.status)}
+          </div>
           <Input
             placeholder={t('Void reason (required)')}
             value={reason}

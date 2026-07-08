@@ -18,23 +18,25 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
-import { getLobeIcon } from '@/lib/lobe-icon'
+
+import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
+import { GroupBadge } from '@/components/group-badge'
+import { StatusBadge, StatusBadgeList } from '@/components/status-badge'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
-import { GroupBadge } from '@/components/group-badge'
-import { StatusBadge, StatusBadgeList } from '@/components/status-badge'
+import { getLobeIcon } from '@/lib/lobe-icon'
+
 import { DEFAULT_TOKEN_UNIT, QUOTA_TYPE_VALUES } from '../constants'
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../lib/dynamic-price'
-import { formatTokenCount, inferModelMetadata } from '../lib/model-metadata'
 import { isTokenBasedModel } from '../lib/model-helpers'
+import { formatTokenCount, inferModelMetadata } from '../lib/model-metadata'
 import {
   formatPrice,
   formatRequestPrice,
@@ -107,9 +109,7 @@ export function usePricingColumns(
       cell: ({ row }) => {
         const model = row.original
         const modelIconKey = model.icon || model.vendor_icon
-        const modelIcon = modelIconKey
-          ? getLobeIcon(modelIconKey, 14)
-          : null
+        const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 14) : null
 
         return (
           <div className='flex min-w-[200px] items-center gap-2'>

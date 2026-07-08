@@ -16,10 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect } from 'react'
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -33,6 +33,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+
 import {
   getDiscountLabel,
   getPaymentIcon,
@@ -229,16 +231,13 @@ export function RechargeFormCard({
                         preset.discount ||
                         topupInfo?.discount?.[preset.value] ||
                         1.0
-                      const {
-                        actualPrice,
-                        savedAmount,
-                        hasDiscount,
-                      } = calculatePresetPricing(
-                        preset.value,
-                        priceRatio,
-                        discount,
-                        usdExchangeRate
-                      )
+                      const { actualPrice, savedAmount, hasDiscount } =
+                        calculatePresetPricing(
+                          preset.value,
+                          priceRatio,
+                          discount,
+                          usdExchangeRate
+                        )
                       const amountDisplay = getPresetAmountDisplay(
                         preset.value,
                         actualPrice
@@ -272,7 +271,8 @@ export function RechargeFormCard({
                               {hasDiscount && savedAmount > 0 && (
                                 <span className='text-green-600'>
                                   {' '}
-                                  • Save {formatWalletPaymentAmount(savedAmount)}
+                                  • Save{' '}
+                                  {formatWalletPaymentAmount(savedAmount)}
                                 </span>
                               )}
                             </div>
@@ -410,8 +410,8 @@ export function RechargeFormCard({
                               getPaymentIcon('waffo')
                             )}
                             <span className='truncate'>
-                            {getPaymentMethodDisplayName(method.name, t)}
-                          </span>
+                              {getPaymentMethodDisplayName(method.name, t)}
+                            </span>
                           </Button>
                         )
 

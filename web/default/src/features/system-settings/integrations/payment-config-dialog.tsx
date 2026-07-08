@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -26,7 +27,10 @@ type PaymentConfigDialogProps = {
   onSave: (config: PaymentConfig) => Promise<void>
 }
 
-const providerDefaults: Record<PaymentConfigProvider, Pick<PaymentConfig, 'name' | 'display_name'>> = {
+const providerDefaults: Record<
+  PaymentConfigProvider,
+  Pick<PaymentConfig, 'name' | 'display_name'>
+> = {
   alipay: { name: 'Alipay', display_name: '支付宝' },
   wxpay: { name: 'WeChat Pay', display_name: '微信支付' },
 }
@@ -90,7 +94,9 @@ export function PaymentConfigDialog({
             {isAlipay ? t('Configure Alipay') : t('Configure WeChat Pay')}
           </DialogTitle>
           <DialogDescription>
-            {t('Configure merchant credentials used for wallet recharge and subscription purchase.')}
+            {t(
+              'Configure merchant credentials used for wallet recharge and subscription purchase.'
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -100,7 +106,9 @@ export function PaymentConfigDialog({
               <Label>{t('Display name')}</Label>
               <Input
                 value={form.display_name || ''}
-                onChange={(event) => setValue('display_name', event.target.value)}
+                onChange={(event) =>
+                  setValue('display_name', event.target.value)
+                }
               />
             </div>
             <div className='space-y-2'>
@@ -248,7 +256,9 @@ export function PaymentConfigDialog({
               <Label>{t('Gateway URL')}</Label>
               <Input
                 value={form.gateway_url || ''}
-                onChange={(event) => setValue('gateway_url', event.target.value)}
+                onChange={(event) =>
+                  setValue('gateway_url', event.target.value)
+                }
               />
             </div>
             <div className='space-y-2'>
@@ -271,7 +281,9 @@ export function PaymentConfigDialog({
             <div>
               <Label>{t('Enable payment gateway')}</Label>
               <p className='text-muted-foreground text-xs'>
-                {t('Enabled gateways are shown to users on wallet and subscription pages.')}
+                {t(
+                  'Enabled gateways are shown to users on wallet and subscription pages.'
+                )}
               </p>
             </div>
             <Switch

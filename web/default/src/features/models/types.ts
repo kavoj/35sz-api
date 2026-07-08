@@ -22,7 +22,13 @@ import { z } from 'zod'
 // Model Types
 // ============================================================================
 
-export type ModelType = 'text' | 'embedding' | 'image' | 'file' | 'audio' | 'video'
+export type ModelType =
+  | 'text'
+  | 'embedding'
+  | 'image'
+  | 'file'
+  | 'audio'
+  | 'video'
 
 /**
  * Bound channel information

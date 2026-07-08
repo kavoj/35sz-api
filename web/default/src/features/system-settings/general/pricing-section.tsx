@@ -16,15 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import * as z from 'zod'
-import type { Resolver } from 'react-hook-form'
-import type { ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
-import { api } from '@/lib/api'
-import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
+import type { ReactNode } from 'react'
+import type { Resolver } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import * as z from 'zod'
+
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -45,6 +44,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { api } from '@/lib/api'
+import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
+
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
 import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
@@ -493,7 +495,7 @@ function LiveUsdCnyReference({
   } else {
     statusNode = (
       <>
-        <span className='font-mono text-base font-semibold text-foreground'>
+        <span className='text-foreground font-mono text-base font-semibold'>
           1 USD ≈ {roundedRate.toFixed(4)} CNY
         </span>
         {data?.asOf && (
@@ -534,10 +536,10 @@ function LiveUsdCnyReference({
   }
 
   return (
-    <div className='rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm'>
+    <div className='border-border bg-muted/30 rounded-md border border-dashed p-3 text-sm'>
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='flex flex-col gap-0.5'>
-          <span className='font-medium text-foreground'>
+          <span className='text-foreground font-medium'>
             {t('Live USD → CNY reference rate')}
           </span>
           <span className='text-muted-foreground text-xs'>

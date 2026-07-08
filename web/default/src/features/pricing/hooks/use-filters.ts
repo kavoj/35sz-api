@@ -16,8 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, useCallback, useState } from 'react'
 import { useSearch } from '@tanstack/react-router'
+import { useMemo, useCallback, useState } from 'react'
+
 import {
   FILTER_ALL,
   SORT_OPTIONS,
@@ -26,8 +27,8 @@ import {
   VIEW_MODES,
   type ViewMode,
 } from '../constants'
-import { filterAndSortModels, extractAllTags } from '../lib/filters'
 import type { CapabilityTabValue } from '../lib/capabilities'
+import { filterAndSortModels, extractAllTags } from '../lib/filters'
 import type { PricingModel, TokenUnit } from '../types'
 
 type FilterState = {

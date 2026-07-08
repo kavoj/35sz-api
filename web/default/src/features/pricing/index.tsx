@@ -18,8 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
+
 import {
   LoadingSkeleton,
   EmptyState,
@@ -186,10 +188,7 @@ export function Pricing() {
             className='mx-auto mb-4 max-w-2xl'
           />
           <div className='mb-4 flex justify-center'>
-            <CapabilityTabs
-              value={capabilityTab}
-              onChange={setCapabilityTab}
-            />
+            <CapabilityTabs value={capabilityTab} onChange={setCapabilityTab} />
           </div>
 
           <main className='min-w-0 space-y-4'>

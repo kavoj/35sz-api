@@ -3,6 +3,7 @@ Copyright (C) 2023-2026 QuantumNous
 ...
 */
 import { useQuery } from '@tanstack/react-query'
+
 import { previewQuotaCredit } from '../api'
 
 export function useQuotaPreview(cents: number) {

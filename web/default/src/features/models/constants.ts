@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { type TFunction } from 'i18next'
+
 import type { NameRule, ModelStatus, SyncSource } from './types'
 
 // ============================================================================
@@ -212,7 +213,7 @@ export const ENDPOINT_TEMPLATES: Record<string, EndpointTemplate> = {
     method: 'POST',
     description: 'Speech to Text',
   },
-  'moderations': {
+  moderations: {
     path: '/v1/moderations',
     method: 'POST',
     description: 'Content Moderation',
@@ -327,12 +328,7 @@ export const TAG_PRESETS = [
   },
   {
     category: 'Content Types',
-    tags: [
-      'safe',
-      'nsfw',
-      'filtered',
-      'unfiltered',
-    ],
+    tags: ['safe', 'nsfw', 'filtered', 'unfiltered'],
   },
 ] as const
 
@@ -342,7 +338,10 @@ export function getTagLabel(t: (key: string) => string, tag: string): string {
 }
 
 // Helper to get translated category label
-export function getTagCategoryLabel(t: (key: string) => string, category: string): string {
+export function getTagCategoryLabel(
+  t: (key: string) => string,
+  category: string
+): string {
   return t(category)
 }
 

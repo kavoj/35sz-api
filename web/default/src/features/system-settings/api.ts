@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
   ConfirmPaymentComplianceResponse,
   PaymentConfig,
@@ -124,7 +125,10 @@ export async function getPaymentConfigByProvider(
 }
 
 export async function createPaymentConfig(request: PaymentConfig) {
-  const res = await api.post<PaymentConfigResponse>('/api/payment-config/', request)
+  const res = await api.post<PaymentConfigResponse>(
+    '/api/payment-config/',
+    request
+  )
   if (!res.data.success) {
     throw new Error(res.data.message || 'Failed to create payment config')
   }

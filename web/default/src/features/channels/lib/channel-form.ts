@@ -17,13 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
+
 import {
   CHANNEL_STATUS,
   ERROR_MESSAGES,
   MODEL_FETCHABLE_TYPES,
 } from '../constants'
 import type { Channel } from '../types'
-import { inferModelType, type ModelType } from './model-types'
 import {
   CHANNEL_TYPE_ADVANCED_CUSTOM,
   advancedCustomConfigUsesRelativeUpstreamPath,
@@ -31,6 +31,7 @@ import {
   stringifyAdvancedCustomConfig,
   validateAdvancedCustomConfig,
 } from './advanced-custom'
+import { inferModelType, type ModelType } from './model-types'
 
 // ============================================================================
 // Form Validation Schema
@@ -136,7 +137,14 @@ export const channelFormSchema = z
     key: z.string(),
     openai_organization: z.string().optional(),
     models: z.string().min(1, ERROR_MESSAGES.REQUIRED_MODELS),
-    model_type: z.enum(['text', 'embedding', 'image', 'file', 'audio', 'video']),
+    model_type: z.enum([
+      'text',
+      'embedding',
+      'image',
+      'file',
+      'audio',
+      'video',
+    ]),
     group: z.array(z.string()).min(1, ERROR_MESSAGES.REQUIRED_GROUP),
     model_mapping: z
       .string()
@@ -406,7 +414,9 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateCheckEnabled = false
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
-  let modelType: ModelType = inferModelType((channel.models || '').split(',')[0] || '')
+  let modelType: ModelType = inferModelType(
+    (channel.models || '').split(',')[0] || ''
+  )
   let advancedCustom = ''
 
   if (channel.settings) {
@@ -558,13 +568,13 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
   // Field passthrough controls:
   // - OpenAI (type 1) and Anthropic (type 14): allow_service_tier
   // - OpenAI only: disable_store, allow_safety_identifier
-  if (formData.type === 1 || formData.type === 14) {
+  if (formData.type === 1 || formData.type === 14 || formData.type === 57) {
     settingsObj.allow_service_tier = formData.allow_service_tier === true
   } else if ('allow_service_tier' in settingsObj) {
     delete settingsObj.allow_service_tier
   }
 
-  if (formData.type === 1) {
+  if (formData.type === 1 || formData.type === 57) {
     settingsObj.disable_store = formData.disable_store === true
     settingsObj.allow_safety_identifier =
       formData.allow_safety_identifier === true

@@ -16,13 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
+import { IconSelector } from '@/components/icon-selector'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -43,10 +45,10 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+
 import { createVendor, updateVendor } from '../../api'
 import { vendorsQueryKeys, modelsQueryKeys } from '../../lib'
 import { vendorFormSchema, type Vendor } from '../../types'
-import { IconSelector } from '@/components/icon-selector'
 
 type VendorMutateDialogProps = {
   open: boolean
@@ -171,7 +173,9 @@ export function VendorMutateDialog({
                     />
                   </FormControl>
                   <FormDescription>
-                    {t('Optional custom name to display instead of the vendor name')}
+                    {t(
+                      'Optional custom name to display instead of the vendor name'
+                    )}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -16,15 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import React, { useState } from 'react'
-import useDialogState from '@/hooks/use-dialog'
 import { useQuery } from '@tanstack/react-query'
+import React, { useState } from 'react'
+
+import { getPaymentConfigs } from '@/features/system-settings/api'
 import {
   getOptionValue,
   useSystemOptions,
 } from '@/features/system-settings/hooks/use-system-options'
-import { getPaymentConfigs } from '@/features/system-settings/api'
 import type { PaymentConfig } from '@/features/system-settings/types'
+import useDialogState from '@/hooks/use-dialog'
+
 import { type PlanRecord, type SubscriptionsDialogType } from '../types'
 
 const CURRENT_COMPLIANCE_TERMS_VERSION = 'v1'
@@ -92,21 +94,21 @@ export function SubscriptionsProvider({
       complianceConfirmed &&
       Boolean(
         paymentOptions.StripeApiSecret &&
-          paymentOptions.StripeWebhookSecret &&
-          paymentOptions.StripePriceId
+        paymentOptions.StripeWebhookSecret &&
+        paymentOptions.StripePriceId
       ),
     creem:
       complianceConfirmed &&
       Boolean(
         paymentOptions.CreemApiKey &&
-          paymentOptions.CreemProducts &&
-          paymentOptions.CreemProducts !== '[]'
+        paymentOptions.CreemProducts &&
+        paymentOptions.CreemProducts !== '[]'
       ),
     waffoPancake:
       complianceConfirmed &&
       Boolean(
         paymentOptions.WaffoPancakeMerchantID &&
-          paymentOptions.WaffoPancakePrivateKey
+        paymentOptions.WaffoPancakePrivateKey
       ),
     alipay:
       complianceConfirmed &&
@@ -118,8 +120,8 @@ export function SubscriptionsProvider({
       complianceConfirmed &&
       Boolean(
         paymentOptions.PayAddress ||
-          paymentOptions.EpayId ||
-          paymentOptions.EpayKey
+        paymentOptions.EpayId ||
+        paymentOptions.EpayKey
       ),
   }
 

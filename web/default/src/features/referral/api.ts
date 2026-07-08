@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
   CommissionDownline,
   CommissionQuotaPreview,
@@ -28,7 +29,9 @@ import type {
 type ApiEnvelope<T> = { success: boolean; message?: string; data?: T }
 
 export async function getCommissionStats(): Promise<CommissionStats> {
-  const res = await api.get<ApiEnvelope<CommissionStats>>('/api/user/commission/stats')
+  const res = await api.get<ApiEnvelope<CommissionStats>>(
+    '/api/user/commission/stats'
+  )
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || 'load failed')
   }
@@ -40,10 +43,9 @@ export async function getCommissionRecords(params: {
   page?: number
   size?: number
 }): Promise<{ records: CommissionRecord[]; total: number }> {
-  const res = await api.get<ApiEnvelope<{ records: CommissionRecord[]; total: number }>>(
-    '/api/user/commission/records',
-    { params },
-  )
+  const res = await api.get<
+    ApiEnvelope<{ records: CommissionRecord[]; total: number }>
+  >('/api/user/commission/records', { params })
   return res.data.data ?? { records: [], total: 0 }
 }
 
@@ -53,7 +55,7 @@ export async function getCommissionRedemptions(params: {
 }): Promise<CommissionRedemption[]> {
   const res = await api.get<ApiEnvelope<{ records: CommissionRedemption[] }>>(
     '/api/user/commission/redemptions',
-    { params },
+    { params }
   )
   return res.data.data?.records ?? []
 }
@@ -63,17 +65,18 @@ export async function getCommissionDownlines(params: {
   page?: number
   size?: number
 }): Promise<{ rows: CommissionDownline[]; total: number }> {
-  const res = await api.get<ApiEnvelope<{ rows: CommissionDownline[]; total: number }>>(
-    '/api/user/commission/downlines',
-    { params },
-  )
+  const res = await api.get<
+    ApiEnvelope<{ rows: CommissionDownline[]; total: number }>
+  >('/api/user/commission/downlines', { params })
   return res.data.data ?? { rows: [], total: 0 }
 }
 
-export async function previewQuotaCredit(cents: number): Promise<CommissionQuotaPreview> {
+export async function previewQuotaCredit(
+  cents: number
+): Promise<CommissionQuotaPreview> {
   const res = await api.get<ApiEnvelope<CommissionQuotaPreview>>(
     '/api/user/commission/quota-preview',
-    { params: { cents } },
+    { params: { cents } }
   )
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || 'preview failed')
@@ -81,10 +84,12 @@ export async function previewQuotaCredit(cents: number): Promise<CommissionQuota
   return res.data.data
 }
 
-export async function redeemCommission(cents: number): Promise<{ quota_credited: number }> {
+export async function redeemCommission(
+  cents: number
+): Promise<{ quota_credited: number }> {
   const res = await api.post<ApiEnvelope<{ quota_credited: number }>>(
     '/api/user/commission/redeem',
-    { cents },
+    { cents }
   )
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || 'redeem failed')

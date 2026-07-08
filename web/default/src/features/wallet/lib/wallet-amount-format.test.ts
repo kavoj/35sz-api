@@ -19,7 +19,8 @@ globalThis.window = { localStorage: localStorageShim } as unknown as Window &
 
 describe('wallet amount formatting', () => {
   test('formats recharge amount in the selected display currency', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { formatWalletDisplayAmount } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -50,7 +51,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('formats actual payment amount in local payment currency', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { formatWalletPaymentAmount } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -68,7 +70,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('builds preset display with payment amount only for CNY display', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { getPresetAmountDisplay } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -89,7 +92,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('builds preset display with recharge and payment amount for USD display', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { getPresetAmountDisplay } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -110,7 +114,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('uses payment amount as selected topup amount for CNY preset display', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { getPresetTopupAmount } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -128,7 +133,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('uses recharge amount as selected topup amount for USD preset display', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { getPresetTopupAmount } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({
@@ -146,7 +152,8 @@ describe('wallet amount formatting', () => {
   })
 
   test('formats confirmation topup amount without applying exchange rate again', async () => {
-    const { useSystemConfigStore } = await import('@/stores/system-config-store')
+    const { useSystemConfigStore } =
+      await import('@/stores/system-config-store')
     const { formatWalletConfirmationTopupAmount } = await import('./format')
 
     useSystemConfigStore.getState().setConfig({

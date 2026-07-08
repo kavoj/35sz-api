@@ -16,9 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useMemo, useCallback } from 'react'
+// Get all available icon names from @lobehub/icons
+import * as LobeIcons from '@lobehub/icons'
 import { Upload, Search, X } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -26,25 +29,37 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
-// Get all available icon names from @lobehub/icons
-import * as LobeIcons from '@lobehub/icons'
-
 // Get commonly used icons for the quick pick section (use .Color for colored icons)
 const POPULAR_ICONS = [
-  'OpenAI.Color', 'Anthropic.Color', 'Google.Color', 'Gemini.Color', 'Claude.Color',
-  'AzureOpenAI.Color', 'Baichuan.Color', 'Zhipu.Color', 'Alibaba.Color', 'Tencent.Color',
-  'ByteDance.Color', 'Moonshot.Color', 'DeepSeek.Color', 'Midjourney.Color', 'StabilityAI.Color',
-  'HuggingFace.Color', 'Replicate.Color', 'TogetherAI.Color', 'FireworksAI.Color', 'Qwen.Color',
-  'Doubao.Color', 'Groq.Color', 'Ollama.Color', 'LMStudio.Color', 'LocalAI.Color',
+  'OpenAI.Color',
+  'Anthropic.Color',
+  'Google.Color',
+  'Gemini.Color',
+  'Claude.Color',
+  'AzureOpenAI.Color',
+  'Baichuan.Color',
+  'Zhipu.Color',
+  'Alibaba.Color',
+  'Tencent.Color',
+  'ByteDance.Color',
+  'Moonshot.Color',
+  'DeepSeek.Color',
+  'Midjourney.Color',
+  'StabilityAI.Color',
+  'HuggingFace.Color',
+  'Replicate.Color',
+  'TogetherAI.Color',
+  'FireworksAI.Color',
+  'Qwen.Color',
+  'Doubao.Color',
+  'Groq.Color',
+  'Ollama.Color',
+  'LMStudio.Color',
+  'LocalAI.Color',
 ]
 
 // Extract all available icon keys from the LobeIcons package
@@ -56,7 +71,8 @@ const getAllIconKeys = () => {
     // Skip internal properties
     if (key.startsWith('__') || key.startsWith('_')) continue
     // Skip non-object/non-function values
-    if (!value || (typeof value !== 'object' && typeof value !== 'function')) continue
+    if (!value || (typeof value !== 'object' && typeof value !== 'function'))
+      continue
     // Skip if key is not a valid component name
     if (!/^[A-Z]/.test(key)) continue
 
@@ -98,20 +114,21 @@ export function IconSelector({
   const filteredIcons = useMemo(() => {
     if (!search) return allIconKeys
     const searchLower = search.toLowerCase()
-    return allIconKeys.filter(key =>
-      key.toLowerCase().includes(searchLower)
-    )
+    return allIconKeys.filter((key) => key.toLowerCase().includes(searchLower))
   }, [allIconKeys, search])
 
   const popularIcons = useMemo(() => {
-    return POPULAR_ICONS.filter(icon => allIconKeys.includes(icon))
+    return POPULAR_ICONS.filter((icon) => allIconKeys.includes(icon))
   }, [allIconKeys])
 
-  const handleSelectIcon = useCallback((iconName: string) => {
-    onChange?.(iconName)
-    setOpen(false)
-    setSearch('')
-  }, [onChange])
+  const handleSelectIcon = useCallback(
+    (iconName: string) => {
+      onChange?.(iconName)
+      setOpen(false)
+      setSearch('')
+    },
+    [onChange]
+  )
 
   const handleCustomIconSubmit = useCallback(() => {
     if (customIconValue.trim()) {
@@ -120,24 +137,30 @@ export function IconSelector({
     }
   }, [customIconValue, onChange])
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string
-      setUploadedIconUrl(dataUrl)
-      onChange?.(dataUrl)
-      setOpen(false)
-    }
-    reader.readAsDataURL(file)
-  }, [onChange])
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string
+        setUploadedIconUrl(dataUrl)
+        onChange?.(dataUrl)
+        setOpen(false)
+      }
+      reader.readAsDataURL(file)
+    },
+    [onChange]
+  )
 
-  const handleClear = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    onChange?.('')
-  }, [onChange])
+  const handleClear = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onChange?.('')
+    },
+    [onChange]
+  )
 
   // Determine if current value is a data URL
   const isDataUrl = value?.startsWith('data:')
@@ -174,24 +197,20 @@ export function IconSelector({
               </span>
             )}
             {value && !isDataUrl && (
-              <span className='text-sm text-muted-foreground'>{value}</span>
+              <span className='text-muted-foreground text-sm'>{value}</span>
             )}
           </div>
           <div className='flex items-center gap-1'>
             {value && (
               <X
-                className='size-4 text-muted-foreground hover:text-foreground'
+                className='text-muted-foreground hover:text-foreground size-4'
                 onClick={handleClear}
               />
             )}
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className='w-96 p-0'
-        align='start'
-        side='bottom'
-      >
+      <PopoverContent className='w-96 p-0' align='start' side='bottom'>
         <Tabs defaultValue='popular' className='w-full'>
           <div className='border-b p-2'>
             <TabsList className='w-full'>
@@ -209,8 +228,8 @@ export function IconSelector({
 
           {/* Popular Icons */}
           <TabsContent value='popular' className='p-2'>
-            <div className='mb-2 relative'>
-              <Search className='absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
+            <div className='relative mb-2'>
+              <Search className='text-muted-foreground absolute top-1/2 left-2 size-4 -translate-y-1/2' />
               <Input
                 placeholder={t('Search icons...')}
                 value={search}
@@ -233,7 +252,7 @@ export function IconSelector({
                   <span className='flex size-8 items-center justify-center'>
                     {getLobeIcon(iconName, 24)}
                   </span>
-                  <span className='max-w-full truncate text-[10px] text-muted-foreground'>
+                  <span className='text-muted-foreground max-w-full truncate text-[10px]'>
                     {iconName.split('.')[0]}
                   </span>
                 </button>
@@ -246,7 +265,7 @@ export function IconSelector({
             <div className='flex flex-col items-center justify-center gap-4'>
               <div className='text-center'>
                 <p className='text-sm font-medium'>{t('Upload custom icon')}</p>
-                <p className='text-xs text-muted-foreground'>
+                <p className='text-muted-foreground text-xs'>
                   {t('Recommended: 28x28 pixels, PNG/SVG/JPG')}
                 </p>
               </div>
@@ -273,7 +292,7 @@ export function IconSelector({
                     alt=''
                     className='size-10 rounded object-contain'
                   />
-                  <span className='text-xs text-muted-foreground'>
+                  <span className='text-muted-foreground text-xs'>
                     {t('Uploaded')}
                   </span>
                 </div>
@@ -286,7 +305,7 @@ export function IconSelector({
             <div className='flex flex-col gap-4'>
               <div className='space-y-2'>
                 <p className='text-sm font-medium'>{t('Enter icon name')}</p>
-                <p className='text-xs text-muted-foreground'>
+                <p className='text-muted-foreground text-xs'>
                   {t('You can manually enter an icon name from @lobehub/icons')}
                 </p>
               </div>
@@ -303,7 +322,7 @@ export function IconSelector({
               {customIconValue && (
                 <div className='flex items-center justify-center gap-2 rounded-lg border p-4'>
                   {getLobeIcon(customIconValue, 32)}
-                  <span className='text-sm text-muted-foreground'>
+                  <span className='text-muted-foreground text-sm'>
                     {t('Preview')}
                   </span>
                 </div>

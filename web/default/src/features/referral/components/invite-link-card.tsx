@@ -2,9 +2,9 @@
 Copyright (C) 2023-2026 QuantumNous
 ...
 */
-import { useMemo, useState } from 'react'
 import { Copy, QrCode } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -24,7 +24,7 @@ export function InviteLinkCard({ affCode }: { affCode: string }) {
   // "/register?aff=" (no value) into the clipboard.
   const link = useMemo(
     () => (affCode ? `${window.location.origin}/register?aff=${affCode}` : ''),
-    [affCode],
+    [affCode]
   )
   return (
     <Card>
@@ -32,7 +32,7 @@ export function InviteLinkCard({ affCode }: { affCode: string }) {
         <CardTitle>{t('My Referral Link')}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-3'>
-        <div className='truncate rounded-md bg-muted p-2 font-mono text-xs'>
+        <div className='bg-muted truncate rounded-md p-2 font-mono text-xs'>
           {link || '—'}
         </div>
         <div className='flex gap-2'>

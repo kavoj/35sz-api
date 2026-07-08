@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
+
 import {
   getWechatPemFileKind,
   detectWechatPemKindByContent,
@@ -23,10 +24,7 @@ describe('getWechatPemFileKind (filename hint, relaxed)', () => {
   })
 
   test('accepts merchant-id prefixed name', () => {
-    assert.equal(
-      getWechatPemFileKind('1746971547_apiclient_cert.pem'),
-      'cert'
-    )
+    assert.equal(getWechatPemFileKind('1746971547_apiclient_cert.pem'), 'cert')
   })
 
   test('accepts mixed-case name', () => {
@@ -39,7 +37,8 @@ describe('getWechatPemFileKind (filename hint, relaxed)', () => {
 })
 
 describe('detectWechatPemKindByContent (authoritative)', () => {
-  const CERT = '-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----\n'
+  const CERT =
+    '-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----\n'
   const PKCS8 =
     '-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n'
   const PKCS1 =
