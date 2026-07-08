@@ -24,6 +24,7 @@ import (
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
+	"github.com/QuantumNous/new-api/service/commission"
 	_ "github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
@@ -297,6 +298,9 @@ func InitResources() error {
 
 	// Initialize options, should after model.InitDB()
 	model.InitOptionMap()
+
+	// Seed default commission rules (L1=20% / L2=5%) if the table is empty.
+	commission.SeedDefaultRules()
 
 	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()
