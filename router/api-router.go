@@ -261,6 +261,16 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
+		commissionAdmin := apiRouter.Group("/commission-admin")
+		commissionAdmin.Use(middleware.RootAuth())
+		{
+			commissionAdmin.GET("/rules", controller.AdminListCommissionRules)
+			commissionAdmin.PUT("/rules/:id", controller.AdminUpdateCommissionRule)
+			commissionAdmin.GET("/records", controller.AdminListRecords)
+			commissionAdmin.POST("/records/:id/void", controller.AdminVoidRecord)
+			commissionAdmin.POST("/settle-now", controller.AdminSettleNow)
+			commissionAdmin.GET("/stats", controller.AdminCommissionOverview)
+		}
 		registerChannelRoutes(apiRouter)
 		registerAuthzRoutes(apiRouter)
 		tokenRoute := apiRouter.Group("/token")

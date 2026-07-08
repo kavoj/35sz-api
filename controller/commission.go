@@ -181,3 +181,158 @@ func parsePagination(c *gin.Context) (int, int) {
 	}
 	return page, size
 }
+
+// ---------- Admin endpoints ----------
+//
+// Guarded by middleware.RootAuth at the route layer.
+
+// AdminListCommissionRules returns every rule (enabled or not) so the config
+// UI can render disabled rows too.
+func AdminListCommissionRules(c *gin.Context) {
+	rules, err := model.ListCommissionRules()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, rules)
+}
+
+type adminUpdateRuleRequest struct {
+	RatePercent   *float64 `json:"rate_percent"`
+	MinTopupCents *int64   `json:"min_topup_cents"`
+	FrozenDays    *int     `json:"frozen_days"`
+	Enabled       *bool    `json:"enabled"`
+}
+
+// AdminUpdateCommissionRule mutates the tunable fields on one rule. Uses
+// pointer fields so an omitted key is not accidentally reset to zero.
+func AdminUpdateCommissionRule(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var req adminUpdateRuleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	updates := map[string]any{}
+	if req.RatePercent != nil {
+		updates["rate_percent"] = *req.RatePercent
+	}
+	if req.MinTopupCents != nil {
+		updates["min_topup_cents"] = *req.MinTopupCents
+	}
+	if req.FrozenDays != nil {
+		updates["frozen_days"] = *req.FrozenDays
+	}
+	if req.Enabled != nil {
+		updates["enabled"] = *req.Enabled
+	}
+	if len(updates) == 0 {
+		common.ApiSuccess(c, nil)
+		return
+	}
+	if err := model.UpdateCommissionRule(id, updates); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// AdminListRecords is the platform-wide commission ledger view. Accepts
+// optional status / beneficiary / source_user / created_at range filters.
+func AdminListRecords(c *gin.Context) {
+	status := c.Query("status")
+	beneficiary, _ := strconv.Atoi(c.Query("beneficiary"))
+	source, _ := strconv.Atoi(c.Query("source"))
+	from, _ := strconv.ParseInt(c.Query("from"), 10, 64)
+	to, _ := strconv.ParseInt(c.Query("to"), 10, 64)
+	page, size := parsePagination(c)
+
+	q := model.DB.Model(&model.CommissionRecord{})
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	if beneficiary != 0 {
+		q = q.Where("beneficiary_id = ?", beneficiary)
+	}
+	if source != 0 {
+		q = q.Where("source_user_id = ?", source)
+	}
+	if from > 0 {
+		q = q.Where("created_at >= ?", from)
+	}
+	if to > 0 {
+		q = q.Where("created_at <= ?", to)
+	}
+	var total int64
+	q.Count(&total)
+
+	var out []model.CommissionRecord
+	if err := q.Order("id DESC").Limit(size).Offset((page - 1) * size).Find(&out).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"records": out, "total": total, "page": page, "size": size})
+}
+
+type adminVoidRequest struct {
+	Reason string `json:"reason"`
+}
+
+// AdminVoidRecord flips a commission record to voided and rolls back the
+// beneficiary's pending/balance counters. Delegates to commission.Void so all
+// the state-machine rules live in one place.
+func AdminVoidRecord(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var req adminVoidRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	if err := commission.Void(id, req.Reason); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// AdminSettleNow drains the pending-and-due queue on demand instead of
+// waiting for the scheduled runner. Used by the admin "settle now" button.
+func AdminSettleNow(c *gin.Context) {
+	n, err := commission.SettlePending()
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	common.ApiSuccess(c, gin.H{"settled": n})
+}
+
+// AdminCommissionOverview returns platform-wide totals for the admin
+// dashboard. Uses coalesce/sum so zero-row tables still return a document.
+func AdminCommissionOverview(c *gin.Context) {
+	type overview struct {
+		TotalCents        int64 `json:"total_cents"`
+		SettledCents      int64 `json:"settled_cents"`
+		PendingCents      int64 `json:"pending_cents"`
+		RedeemedCents     int64 `json:"redeemed_cents"`
+		ParticipantsCount int64 `json:"participants_count"`
+		FirstTopupCount   int64 `json:"first_topup_count"`
+	}
+	var out overview
+	model.DB.Model(&model.CommissionRecord{}).
+		Where("status IN ?", []string{model.CommissionStatusPending, model.CommissionStatusSettled}).
+		Select("COALESCE(SUM(commission_amount_cents),0)").Scan(&out.TotalCents)
+	model.DB.Model(&model.CommissionRecord{}).
+		Where("status = ?", model.CommissionStatusSettled).
+		Select("COALESCE(SUM(commission_amount_cents),0)").Scan(&out.SettledCents)
+	model.DB.Model(&model.CommissionRecord{}).
+		Where("status = ?", model.CommissionStatusPending).
+		Select("COALESCE(SUM(commission_amount_cents),0)").Scan(&out.PendingCents)
+	model.DB.Model(&model.CommissionRedemption{}).
+		Select("COALESCE(SUM(commission_cents),0)").Scan(&out.RedeemedCents)
+	model.DB.Model(&model.UserReferralPath{}).Count(&out.ParticipantsCount)
+	model.DB.Model(&model.CommissionRecord{}).
+		Where("level = ?", 1).
+		Distinct("source_user_id").Count(&out.FirstTopupCount)
+
+	common.ApiSuccess(c, out)
+}
