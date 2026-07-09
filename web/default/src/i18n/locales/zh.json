@@ -5343,6 +5343,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "Hugging Face 词典在线同步即将上线。目前请编辑 web/default/src/features/models/lib/known-model-registry.ts 手动新增模型。",
     "Model type": "模型类型",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "主要输出形态 — 用于模型列表的类型筛选。系统会依据模型名自动识别，如识别有误可手动调整。",
-    "Embedding": "向量嵌入"
+    "Embedding": "向量嵌入",
+    "Billing type": "计费类型",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "计费形式。系统会依据模型名自动识别，如识别有误可手动调整。计费单位：{{unit}}。",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "此模型按 {{unit}} 原生计费。下方基于 token 的倍率字段已隐藏 — 保存 {{unit}} 单价即可生效。",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "完整的原生价格编辑器（按秒、按张、分辨率倍率、质量/尺寸档位）将在下个版本上线。当前请使用上方\"官方参考价\"面板配合下方倍率字段做近似计费。",
+    "Chat (per-token)": "对话 (按 token)",
+    "Multimodal chat (per-token, with image/audio input)": "多模态对话 (按 token，含图像/音频输入)",
+    "Image generation (per-image)": "图像生成 (按张)",
+    "Video generation (per-second)": "视频生成 (按秒)",
+    "Speech recognition (per-minute)": "语音识别 (按分钟)",
+    "Speech synthesis (per-1M-characters)": "语音合成 (按 100 万字符)",
+    "Embedding / Reranking (per-token, input only)": "向量嵌入 / 重排序 (按 token，仅输入)",
+    "per 1M tokens": "$/1M tokens",
+    "per image": "$/张",
+    "per second": "$/秒",
+    "per minute": "$/分钟",
+    "per 1M characters": "$/100 万字符"
   }
 }

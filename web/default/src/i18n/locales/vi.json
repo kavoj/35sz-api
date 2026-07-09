@@ -5273,6 +5273,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "Đồng bộ từ điển Hugging Face trực tuyến sắp ra mắt. Hiện tại hãy chỉnh sửa web/default/src/features/models/lib/known-model-registry.ts để thêm mô hình.",
     "Model type": "Loại mô hình",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "Kiểu đầu ra chính — dùng cho bộ lọc danh sách. Tự phát hiện từ tên mô hình; điều chỉnh nếu cần.",
-    "Embedding": "Embedding"
+    "Embedding": "Embedding",
+    "Billing type": "Loại tính phí",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "Hình thức tính phí. Tự phát hiện từ tên mô hình; điều chỉnh nếu cần. Đơn vị: {{unit}}.",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "Mô hình này tính phí theo {{unit}}. Các trường tỷ lệ theo token bị ẩn — lưu giá theo {{unit}} để có hiệu lực.",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "Trình soạn giá nguyên bản đầy đủ (mỗi giây, mỗi ảnh, hệ số phân giải, cấp chất lượng/kích thước) sẽ có trong bản phát hành tiếp theo. Hiện tại hãy dùng bảng \"参考价\" ở trên và các trường tỷ lệ.",
+    "Chat (per-token)": "Chat (theo token)",
+    "Multimodal chat (per-token, with image/audio input)": "Chat đa phương thức (theo token, có đầu vào ảnh/âm thanh)",
+    "Image generation (per-image)": "Sinh ảnh (mỗi ảnh)",
+    "Video generation (per-second)": "Sinh video (mỗi giây)",
+    "Speech recognition (per-minute)": "Nhận dạng giọng nói (mỗi phút)",
+    "Speech synthesis (per-1M-characters)": "Tổng hợp giọng nói (mỗi 1M ký tự)",
+    "Embedding / Reranking (per-token, input only)": "Embedding / Reranking (theo token, chỉ đầu vào)",
+    "per 1M tokens": "$/1M tokens",
+    "per image": "$/ảnh",
+    "per second": "$/giây",
+    "per minute": "$/phút",
+    "per 1M characters": "$/1M ký tự"
   }
 }

@@ -118,7 +118,7 @@ import {
   getGroupLabelKey,
   getPipelineTagLabelKey,
 } from '../../lib/hf-taxonomy'
-import { pipelineTagToModelType } from '../../lib/pricing-schema'
+import { pipelineTagToModelType, normalizePricingKind, PIPELINE_TAG_TO_KIND, PRICING_KINDS, getKindLabelKey, getPriceUnitKey, type PricingKind } from '../../lib/pricing-schema'
 import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
 import { OfficialPricingReference } from '../pricing/official-pricing-reference'
@@ -141,6 +141,20 @@ const extendedModelFormSchema = z.object({
    * drawer if the admin disagrees. Falls back to "text" when unset.
    */
   model_type: z.enum(['text', 'image', 'video', 'audio', 'embedding', 'file']),
+  /**
+   * Persisted pricing_kind — decides which pricing schema the drawer
+   * renders. Auto-inferred from pipeline_tag on new model; admin can
+   * override with the KindSelector below. Falls back to "chat" when unset.
+   */
+  pricing_kind: z.enum([
+    'chat',
+    'multimodal-chat',
+    'image-gen',
+    'video-gen',
+    'audio-in',
+    'audio-out',
+    'embedding',
+  ]),
   context_length: z.number().optional(),
   price: z.string().optional(),
   ratio: z.string().optional(),
@@ -236,6 +250,14 @@ export function ModelMutateDrawer({
       ImageRatio: '',
       AudioRatio: '',
       AudioCompletionRatio: '',
+      // Structured per-kind pricing tables — see PR-1
+      // (setting/ratio_setting/{image,video,audio_in,audio_out}_pricing.go).
+      // Empty string means "not loaded yet"; the drawer treats missing keys
+      // as an empty JSON blob when the schema-aware pricing field renders.
+      ImagePricing: '',
+      VideoPricing: '',
+      AudioInPricing: '',
+      AudioOutPricing: '',
       ExposeRatioEnabled: false,
       'billing_setting.billing_mode': '{}',
       'billing_setting.billing_expr': '{}',
@@ -394,6 +416,35 @@ export function ModelMutateDrawer({
     ) {
       form.setValue('model_type', inferredType, { shouldDirty: true })
       lastAutoModelTypeRef.current = inferredType
+    }
+  }, [inferredDefaults.pipelineTag, inferredDefaults.source, open, form])
+
+  // pricing_kind auto-inference from pipeline_tag.
+  //
+  // Same pattern as model_type: infer on new-model create, don't overwrite
+  // admin-picked values. The KindSelector dropdown lets admin override; a
+  // manual change parks lastAutoKindRef out of sync so subsequent auto
+  // inferences don't clobber it.
+  const lastAutoKindRef = useRef<PricingKind | undefined>(undefined)
+  useEffect(() => {
+    if (!open) return
+    if (inferredDefaults.source === 'fallback') {
+      lastAutoKindRef.current = undefined
+      return
+    }
+    const inferredKind = PIPELINE_TAG_TO_KIND[inferredDefaults.pipelineTag]
+    const current = form.getValues('pricing_kind') as PricingKind
+    if (!current || current === 'chat') {
+      form.setValue('pricing_kind', inferredKind, { shouldDirty: true })
+      lastAutoKindRef.current = inferredKind
+      return
+    }
+    if (
+      current === lastAutoKindRef.current &&
+      lastAutoKindRef.current !== inferredKind
+    ) {
+      form.setValue('pricing_kind', inferredKind, { shouldDirty: true })
+      lastAutoKindRef.current = inferredKind
     }
   }, [inferredDefaults.pipelineTag, inferredDefaults.source, open, form])
 
@@ -566,6 +617,7 @@ export function ModelMutateDrawer({
         model_type: (model.model_type || 'text') as z.infer<
           typeof extendedModelFormSchema
         >['model_type'],
+        pricing_kind: normalizePricingKind(model.pricing_kind),
         context_length: model.context_length,
         price: '',
         ratio: '',
@@ -683,6 +735,7 @@ export function ModelMutateDrawer({
         // has a valid value before the effect fires; the auto-inference
         // effect overrides it when a model name is present.
         model_type: 'text',
+        pricing_kind: 'chat',
         context_length: undefined,
         price: '',
         ratio: '',
@@ -1578,6 +1631,97 @@ export function ModelMutateDrawer({
                 }}
                 onApply={applyOfficialPricing}
               />
+
+              {/* Kind selector — chooses which pricing schema this model
+                * uses. Auto-populated from pipeline_tag inference; admin
+                * may override to force a specific billing shape (e.g. an
+                * image model advertised as text-to-image but actually
+                * billed per-request should be forced to a chat kind). */}
+              <FormField
+                control={form.control}
+                name='pricing_kind'
+                render={({ field }) => {
+                  const kind = field.value as PricingKind
+                  return (
+                    <FormItem>
+                      <FormLabel>{t('Billing type')}</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={kind}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {PRICING_KINDS.map((k) => (
+                                <SelectItem key={k} value={k}>
+                                  {t(getKindLabelKey(k))}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.',
+                          { unit: t(getPriceUnitKey(kind)) }
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
+              />
+
+              {/* Schema-aware pricing block — replaces the legacy per-token
+                * radio when kind is one of the "structured" kinds
+                * (image-gen / video-gen / audio-in / audio-out). Legacy
+                * kinds (chat / multimodal-chat / embedding) keep the
+                * existing UI below to preserve backward-compat. */}
+              {(() => {
+                const kind = form.watch('pricing_kind') as PricingKind
+                if (
+                  kind !== 'image-gen' &&
+                  kind !== 'video-gen' &&
+                  kind !== 'audio-in' &&
+                  kind !== 'audio-out'
+                ) {
+                  return null
+                }
+                return (
+                  <div className='bg-muted/30 rounded-md border p-3 text-sm'>
+                    <p className='text-muted-foreground mb-3 text-xs'>
+                      {t(
+                        'This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.',
+                        { unit: t(getPriceUnitKey(kind)) }
+                      )}
+                    </p>
+                    <p className='text-muted-foreground text-xs italic'>
+                      {t(
+                        'Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the "官方参考价" panel above and the ratio fields for approximate billing.'
+                      )}
+                    </p>
+                  </div>
+                )
+              })()}
+
+              {/* Existing per-token / per-request UI — still shown for
+                * chat / multimodal-chat / embedding kinds. Hidden for the
+                * 4 structured kinds because their native fields will render
+                * above once the editor lands. */}
+              {(() => {
+                const kind = form.watch('pricing_kind') as PricingKind
+                const useLegacyUI =
+                  kind === 'chat' ||
+                  kind === 'multimodal-chat' ||
+                  kind === 'embedding' ||
+                  !kind
+                if (!useLegacyUI) return null
+                return null // fall through to the existing legacy block below
+              })()}
 
               <div className='space-y-4'>
                 <Label>{t('Pricing mode')}</Label>

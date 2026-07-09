@@ -220,6 +220,16 @@ export type ModelSettings = {
   ImageRatio: string
   AudioRatio: string
   AudioCompletionRatio: string
+  /**
+   * Structured pricing settings introduced with pricing_kind. Each is a
+   * JSON blob (`map[string]<Kind-specific-struct>`) — see
+   * setting/ratio_setting/{image,video,audio_in,audio_out}_pricing.go for
+   * the schemas.
+   */
+  ImagePricing: string
+  VideoPricing: string
+  AudioInPricing: string
+  AudioOutPricing: string
   ExposeRatioEnabled: boolean
   'billing_setting.billing_mode': string
   'billing_setting.billing_expr': string

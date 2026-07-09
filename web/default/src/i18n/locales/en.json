@@ -5322,6 +5322,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.",
     "Model type": "Model type",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.",
-    "Embedding": "Embedding"
+    "Embedding": "Embedding",
+    "Billing type": "Billing type",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.",
+    "Chat (per-token)": "Chat (per-token)",
+    "Multimodal chat (per-token, with image/audio input)": "Multimodal chat (per-token, with image/audio input)",
+    "Image generation (per-image)": "Image generation (per-image)",
+    "Video generation (per-second)": "Video generation (per-second)",
+    "Speech recognition (per-minute)": "Speech recognition (per-minute)",
+    "Speech synthesis (per-1M-characters)": "Speech synthesis (per-1M-characters)",
+    "Embedding / Reranking (per-token, input only)": "Embedding / Reranking (per-token, input only)",
+    "per 1M tokens": "per 1M tokens",
+    "per image": "per image",
+    "per second": "per second",
+    "per minute": "per minute",
+    "per 1M characters": "per 1M characters"
   }
 }

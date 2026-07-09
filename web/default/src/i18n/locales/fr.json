@@ -5273,6 +5273,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "La synchronisation en ligne du dictionnaire Hugging Face arrive bientôt. En attendant, modifiez web/default/src/features/models/lib/known-model-registry.ts pour ajouter un modèle.",
     "Model type": "Type de modèle",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "Modalité de sortie principale — utilisée par le filtre de liste. Détectée depuis le nom du modèle; ajustez si nécessaire.",
-    "Embedding": "Embedding"
+    "Embedding": "Embedding",
+    "Billing type": "Type de facturation",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "Forme de facturation. Détectée depuis le nom du modèle; ajustez si nécessaire. Unité : {{unit}}.",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "Ce modèle est facturé nativement en {{unit}}. Les champs de ratio par token sont masqués — enregistrez le prix par {{unit}}.",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "L'éditeur de prix natif complet (par seconde, par image, multiplicateurs de résolution, niveaux qualité/taille) arrive dans la prochaine version. Pour l'instant, utilisez le panneau «参考价» ci-dessus et les champs de ratio.",
+    "Chat (per-token)": "Chat (par-token)",
+    "Multimodal chat (per-token, with image/audio input)": "Chat multimodal (par-token, avec entrée image/audio)",
+    "Image generation (per-image)": "Génération d'image (par image)",
+    "Video generation (per-second)": "Génération vidéo (par seconde)",
+    "Speech recognition (per-minute)": "Reconnaissance vocale (par minute)",
+    "Speech synthesis (per-1M-characters)": "Synthèse vocale (par 1M caractères)",
+    "Embedding / Reranking (per-token, input only)": "Embedding / Reranking (par-token, entrée uniquement)",
+    "per 1M tokens": "par 1M tokens",
+    "per image": "par image",
+    "per second": "par seconde",
+    "per minute": "par minute",
+    "per 1M characters": "par 1M caractères"
   }
 }

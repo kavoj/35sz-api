@@ -5273,6 +5273,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "Hugging Face 辞書のオンライン同期は近日公開予定です。今のところは web/default/src/features/models/lib/known-model-registry.ts を編集してモデルを追加してください。",
     "Model type": "モデルタイプ",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "主な出力形式 — モデルリストのフィルタで使用されます。モデル名から自動検出、誤検出時は手動で修正してください。",
-    "Embedding": "エンベディング"
+    "Embedding": "エンベディング",
+    "Billing type": "課金方式",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "課金形式。モデル名から自動検出、誤検出時は手動で調整してください。単位：{{unit}}。",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "このモデルは {{unit}} で原始的に課金されます。以下のトークン倍率フィールドは非表示です — {{unit}} 単価を保存してください。",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "完全なネイティブ価格エディタ（秒単位、枚単位、解像度倍率、品質・サイズ層）は次のリリースで公開されます。現時点では上の「公式参考価格」パネルと以下の倍率フィールドで概算課金してください。",
+    "Chat (per-token)": "チャット (トークン単位)",
+    "Multimodal chat (per-token, with image/audio input)": "マルチモーダルチャット (トークン単位、画像/音声入力対応)",
+    "Image generation (per-image)": "画像生成 (枚単位)",
+    "Video generation (per-second)": "動画生成 (秒単位)",
+    "Speech recognition (per-minute)": "音声認識 (分単位)",
+    "Speech synthesis (per-1M-characters)": "音声合成 (100 万文字単位)",
+    "Embedding / Reranking (per-token, input only)": "エンベディング / 再ランキング (トークン単位、入力のみ)",
+    "per 1M tokens": "$/1M tokens",
+    "per image": "$/枚",
+    "per second": "$/秒",
+    "per minute": "$/分",
+    "per 1M characters": "$/100万文字"
   }
 }

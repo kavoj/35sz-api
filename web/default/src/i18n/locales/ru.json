@@ -5273,6 +5273,22 @@
     "Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.": "Онлайн-синхронизация словаря Hugging Face появится скоро. Пока что отредактируйте web/default/src/features/models/lib/known-model-registry.ts, чтобы добавить модель.",
     "Model type": "Тип модели",
     "Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.": "Основная выходная модальность — используется в фильтре списка. Определяется автоматически по имени модели; исправьте вручную если необходимо.",
-    "Embedding": "Эмбеддинг"
+    "Embedding": "Эмбеддинг",
+    "Billing type": "Тип биллинга",
+    "Billing shape. Auto-detected from the model name; override if the inference is wrong. Unit: {{unit}}.": "Форма биллинга. Определяется по имени модели; исправьте вручную если необходимо. Единица: {{unit}}.",
+    "This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.": "Эта модель тарифицируется по {{unit}}. Поля коэффициентов по токенам скрыты — сохраните цену за {{unit}}.",
+    "Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the \"官方参考价\" panel above and the ratio fields for approximate billing.": "Полный редактор нативных цен (за секунду, за изображение, мультипликаторы разрешений, уровни качества/размера) появится в следующем релизе. Пока используйте панель «参考价» выше и поля коэффициентов.",
+    "Chat (per-token)": "Чат (за токен)",
+    "Multimodal chat (per-token, with image/audio input)": "Мультимодальный чат (за токен, с изображением/аудио)",
+    "Image generation (per-image)": "Генерация изображений (за изображение)",
+    "Video generation (per-second)": "Генерация видео (за секунду)",
+    "Speech recognition (per-minute)": "Распознавание речи (за минуту)",
+    "Speech synthesis (per-1M-characters)": "Синтез речи (за 1M символов)",
+    "Embedding / Reranking (per-token, input only)": "Эмбеддинги / Реранкинг (за токен, только вход)",
+    "per 1M tokens": "за 1M токенов",
+    "per image": "за изображение",
+    "per second": "за секунду",
+    "per minute": "за минуту",
+    "per 1M characters": "за 1M символов"
   }
 }
