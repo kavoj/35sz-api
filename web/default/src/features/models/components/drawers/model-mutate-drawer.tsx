@@ -119,6 +119,22 @@ import {
   getPipelineTagLabelKey,
 } from '../../lib/hf-taxonomy'
 import { pipelineTagToModelType, normalizePricingKind, PIPELINE_TAG_TO_KIND, PRICING_KINDS, getKindLabelKey, getPriceUnitKey, type PricingKind } from '../../lib/pricing-schema'
+import {
+  emptyAudioInPricing,
+  emptyAudioOutPricing,
+  emptyImagePricing,
+  emptyVideoPricing,
+  type AudioInPricing,
+  type AudioOutPricing,
+  type ImagePricing,
+  type VideoPricing,
+} from '../../lib/pricing-types'
+import {
+  AudioInEditor,
+  AudioOutEditor,
+  ImageGenEditor,
+  VideoGenEditor,
+} from '../pricing/structured-pricing-editor'
 import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
 import { OfficialPricingReference } from '../pricing/official-pricing-reference'
@@ -192,6 +208,22 @@ export function ModelMutateDrawer({
   const [promptPrice, setPromptPrice] = useState('')
   const [completionPrice, setCompletionPrice] = useState('')
   const [oldModelName, setOldModelName] = useState<string>('')
+  // Structured per-kind pricing state — populated from modelSettings on open,
+  // written back to system-options on submit. Kept as separate useState so
+  // switching kind mid-edit doesn't clobber the other kinds' in-progress
+  // values.
+  const [imagePricing, setImagePricing] = useState<ImagePricing>(() =>
+    emptyImagePricing()
+  )
+  const [videoPricing, setVideoPricing] = useState<VideoPricing>(() =>
+    emptyVideoPricing()
+  )
+  const [audioInPricing, setAudioInPricing] = useState<AudioInPricing>(() =>
+    emptyAudioInPricing()
+  )
+  const [audioOutPricing, setAudioOutPricing] = useState<AudioOutPricing>(() =>
+    emptyAudioOutPricing()
+  )
 
   // Fetch vendors for dropdown
   const { data: vendorsData } = useQuery({
@@ -669,6 +701,77 @@ export function ModelMutateDrawer({
         const audioRatio = audioMap[modelName]
         const audioCompletionRatio = audioCompletionMap[modelName]
 
+        // Load structured pricing (image-gen / video-gen / audio-in /
+        // audio-out). Each map is `{ modelName: <Kind-specific-struct> }`.
+        // Base USD values are stored — convert to display currency for the
+        // input fields, mirroring what `price` above does.
+        const imagePricingMapRaw = safeJsonParse<Record<string, ImagePricing>>(
+          modelSettings.ImagePricing || '{}',
+          { fallback: {}, silent: true }
+        )
+        const videoPricingMapRaw = safeJsonParse<Record<string, VideoPricing>>(
+          modelSettings.VideoPricing || '{}',
+          { fallback: {}, silent: true }
+        )
+        const audioInPricingMapRaw = safeJsonParse<
+          Record<string, AudioInPricing>
+        >(modelSettings.AudioInPricing || '{}', {
+          fallback: {},
+          silent: true,
+        })
+        const audioOutPricingMapRaw = safeJsonParse<
+          Record<string, AudioOutPricing>
+        >(modelSettings.AudioOutPricing || '{}', {
+          fallback: {},
+          silent: true,
+        })
+        // Prices come back in base USD. The editor UI works in display
+        // currency to match the existing per-token/per-request flow.
+        const rawImg = imagePricingMapRaw[modelName]
+        setImagePricing(
+          rawImg
+            ? {
+                ...rawImg,
+                price_per_image: convertUSDToBillingDisplay(
+                  rawImg.price_per_image
+                ),
+              }
+            : emptyImagePricing()
+        )
+        const rawVid = videoPricingMapRaw[modelName]
+        setVideoPricing(
+          rawVid
+            ? {
+                ...rawVid,
+                price_per_second: convertUSDToBillingDisplay(
+                  rawVid.price_per_second
+                ),
+              }
+            : emptyVideoPricing()
+        )
+        const rawAin = audioInPricingMapRaw[modelName]
+        setAudioInPricing(
+          rawAin
+            ? {
+                ...rawAin,
+                price_per_minute: convertUSDToBillingDisplay(
+                  rawAin.price_per_minute
+                ),
+              }
+            : emptyAudioInPricing()
+        )
+        const rawAout = audioOutPricingMapRaw[modelName]
+        setAudioOutPricing(
+          rawAout
+            ? {
+                ...rawAout,
+                price_per_million_chars: convertUSDToBillingDisplay(
+                  rawAout.price_per_million_chars
+                ),
+              }
+            : emptyAudioOutPricing()
+        )
+
         // Determine pricing mode
         if (price !== undefined && price !== null) {
           setPricingMode('per-request')
@@ -720,6 +823,11 @@ export function ModelMutateDrawer({
       setPromptPrice('')
       setCompletionPrice('')
       setAdvancedOpen(false)
+      // Reset structured pricing to empty defaults for new-model creation.
+      setImagePricing(emptyImagePricing())
+      setVideoPricing(emptyVideoPricing())
+      setAudioInPricing(emptyAudioInPricing())
+      setAudioOutPricing(emptyAudioOutPricing())
       form.reset({
         model_name: currentRow?.model_name || '',
         description: '',
@@ -942,6 +1050,127 @@ export function ModelMutateDrawer({
                 key: 'AudioCompletionRatio',
                 value: newAudioCompletionRatio,
               })
+            }
+
+            // Structured per-kind pricing save — only write to the map that
+            // matches the current pricing_kind. This scopes each edit to a
+            // single option key and avoids clobbering unrelated maps when
+            // an admin toggles between kinds mid-session.
+            const currentKind = normalizePricingKind(values.pricing_kind)
+            const imagePricingMapRaw2 = safeJsonParse<
+              Record<string, ImagePricing>
+            >(modelSettings.ImagePricing || '{}', { fallback: {}, silent: true })
+            const videoPricingMapRaw2 = safeJsonParse<
+              Record<string, VideoPricing>
+            >(modelSettings.VideoPricing || '{}', { fallback: {}, silent: true })
+            const audioInPricingMapRaw2 = safeJsonParse<
+              Record<string, AudioInPricing>
+            >(modelSettings.AudioInPricing || '{}', {
+              fallback: {},
+              silent: true,
+            })
+            const audioOutPricingMapRaw2 = safeJsonParse<
+              Record<string, AudioOutPricing>
+            >(modelSettings.AudioOutPricing || '{}', {
+              fallback: {},
+              silent: true,
+            })
+
+            // Delete stale entry under the previous name (rename support)
+            // — mirrors what happens above for legacy priceMap / ratioMap.
+            if (isEditing && oldModelName && oldModelName !== finalModelName) {
+              delete imagePricingMapRaw2[oldModelName]
+              delete videoPricingMapRaw2[oldModelName]
+              delete audioInPricingMapRaw2[oldModelName]
+              delete audioOutPricingMapRaw2[oldModelName]
+            }
+            // Also remove the current-name entry from the OTHER three maps
+            // when the admin has changed kind — prevents an image-gen row
+            // from leaking into VideoPricing after a kind flip.
+            if (currentKind !== 'image-gen') delete imagePricingMapRaw2[finalModelName]
+            if (currentKind !== 'video-gen') delete videoPricingMapRaw2[finalModelName]
+            if (currentKind !== 'audio-in') delete audioInPricingMapRaw2[finalModelName]
+            if (currentKind !== 'audio-out') delete audioOutPricingMapRaw2[finalModelName]
+
+            // Write the currently-selected kind's structured pricing.
+            // Convert display-currency numbers to base USD, matching the
+            // load path above. Only write when the base price is > 0 —
+            // an empty entry is a delete, so admins can "unset" a kind
+            // by wiping the price field before saving.
+            if (currentKind === 'image-gen' && imagePricing.price_per_image > 0) {
+              imagePricingMapRaw2[finalModelName] = {
+                ...imagePricing,
+                price_per_image: convertBillingDisplayToUSD(
+                  imagePricing.price_per_image
+                ),
+              }
+            }
+            if (currentKind === 'video-gen' && videoPricing.price_per_second > 0) {
+              videoPricingMapRaw2[finalModelName] = {
+                ...videoPricing,
+                price_per_second: convertBillingDisplayToUSD(
+                  videoPricing.price_per_second
+                ),
+              }
+            }
+            if (
+              currentKind === 'audio-in' &&
+              audioInPricing.price_per_minute > 0
+            ) {
+              audioInPricingMapRaw2[finalModelName] = {
+                ...audioInPricing,
+                price_per_minute: convertBillingDisplayToUSD(
+                  audioInPricing.price_per_minute
+                ),
+              }
+            }
+            if (
+              currentKind === 'audio-out' &&
+              audioOutPricing.price_per_million_chars > 0
+            ) {
+              audioOutPricingMapRaw2[finalModelName] = {
+                ...audioOutPricing,
+                price_per_million_chars: convertBillingDisplayToUSD(
+                  audioOutPricing.price_per_million_chars
+                ),
+              }
+            }
+
+            const newImagePricing = normalizeJsonString(
+              JSON.stringify(imagePricingMapRaw2)
+            )
+            if (
+              newImagePricing !==
+              normalizeJsonString(modelSettings.ImagePricing || '{}')
+            ) {
+              updates.push({ key: 'ImagePricing', value: newImagePricing })
+            }
+            const newVideoPricing = normalizeJsonString(
+              JSON.stringify(videoPricingMapRaw2)
+            )
+            if (
+              newVideoPricing !==
+              normalizeJsonString(modelSettings.VideoPricing || '{}')
+            ) {
+              updates.push({ key: 'VideoPricing', value: newVideoPricing })
+            }
+            const newAudioInPricing = normalizeJsonString(
+              JSON.stringify(audioInPricingMapRaw2)
+            )
+            if (
+              newAudioInPricing !==
+              normalizeJsonString(modelSettings.AudioInPricing || '{}')
+            ) {
+              updates.push({ key: 'AudioInPricing', value: newAudioInPricing })
+            }
+            const newAudioOutPricing = normalizeJsonString(
+              JSON.stringify(audioOutPricingMapRaw2)
+            )
+            if (
+              newAudioOutPricing !==
+              normalizeJsonString(modelSettings.AudioOutPricing || '{}')
+            ) {
+              updates.push({ key: 'AudioOutPricing', value: newAudioOutPricing })
             }
 
             for (const update of updates) {
@@ -1691,40 +1920,62 @@ export function ModelMutateDrawer({
                 ) {
                   return null
                 }
+                const unit = t(getPriceUnitKey(kind))
                 return (
-                  <div className='bg-muted/30 rounded-md border p-3 text-sm'>
-                    <p className='text-muted-foreground mb-3 text-xs'>
+                  <div className='space-y-4 rounded-md border p-4'>
+                    <div className='text-muted-foreground text-xs'>
                       {t(
-                        'This model bills natively in {{unit}}. The token-based ratio fields below are hidden — save the {{unit}} price to persist.',
-                        { unit: t(getPriceUnitKey(kind)) }
+                        'This model bills natively in {{unit}}. Values below are entered in the current display currency and stored as base USD.',
+                        { unit }
                       )}
-                    </p>
-                    <p className='text-muted-foreground text-xs italic'>
-                      {t(
-                        'Full native price editor (per-second, per-image, resolution multipliers, quality/size tiers) is coming in the next release. For now, use the "官方参考价" panel above and the ratio fields for approximate billing.'
-                      )}
-                    </p>
+                    </div>
+                    {kind === 'image-gen' && (
+                      <ImageGenEditor
+                        value={imagePricing}
+                        onChange={setImagePricing}
+                        currencyLabel={pricingCurrencyLabel}
+                      />
+                    )}
+                    {kind === 'video-gen' && (
+                      <VideoGenEditor
+                        value={videoPricing}
+                        onChange={setVideoPricing}
+                        currencyLabel={pricingCurrencyLabel}
+                      />
+                    )}
+                    {kind === 'audio-in' && (
+                      <AudioInEditor
+                        value={audioInPricing}
+                        onChange={setAudioInPricing}
+                        currencyLabel={pricingCurrencyLabel}
+                      />
+                    )}
+                    {kind === 'audio-out' && (
+                      <AudioOutEditor
+                        value={audioOutPricing}
+                        onChange={setAudioOutPricing}
+                        currencyLabel={pricingCurrencyLabel}
+                      />
+                    )}
                   </div>
                 )
               })()}
 
               {/* Existing per-token / per-request UI — still shown for
                 * chat / multimodal-chat / embedding kinds. Hidden for the
-                * 4 structured kinds because their native fields will render
-                * above once the editor lands. */}
-              {(() => {
+                * 4 structured kinds whose native editors render above. */}
+              {((): boolean => {
                 const kind = form.watch('pricing_kind') as PricingKind
-                const useLegacyUI =
+                return (
                   kind === 'chat' ||
                   kind === 'multimodal-chat' ||
                   kind === 'embedding' ||
                   !kind
-                if (!useLegacyUI) return null
-                return null // fall through to the existing legacy block below
-              })()}
-
-              <div className='space-y-4'>
-                <Label>{t('Pricing mode')}</Label>
+                )
+              })() && (
+                <>
+                  <div className='space-y-4'>
+                    <Label>{t('Pricing mode')}</Label>
                 <RadioGroup
                   value={pricingMode}
                   onValueChange={(value) =>
@@ -2117,6 +2368,8 @@ export function ModelMutateDrawer({
                       />
                     </CollapsibleContent>
                   </Collapsible>
+                </>
+              )}
                 </>
               )}
             </SideDrawerSection>
