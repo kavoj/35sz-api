@@ -364,8 +364,26 @@ func UpdateModelPriceByJSONString(jsonStr string) error {
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
+//
+// PR-5 lookup order (first hit wins):
+//  1. EffectivePerRequestPrice — the structured pricing tables
+//     (ImagePricing / VideoPricing / AudioInPricing / AudioOutPricing).
+//     Admins editing native units in the /models/metadata drawer land
+//     here.
+//  2. Legacy `ModelPrice` map (this file's original behavior). Empty for
+//     chat / embedding models, non-empty for legacy per-request configs.
+//  3. CompactWildcardModelKey — the "thinking-*" and similar wildcards.
+//
+// The structured probe never returns for chat / multimodal-chat / embedding
+// (those save flows don't write to any structured table), so those code
+// paths hit the legacy map on the first *effective* lookup — zero behavior
+// change from PR-5 for the token-billed models.
 func GetModelPrice(name string, printErr bool) (float64, bool) {
 	name = FormatMatchingModelName(name)
+
+	if price, ok := EffectivePerRequestPrice(name); ok {
+		return price, true
+	}
 
 	if price, ok := modelPriceMap.Get(name); ok {
 		return price, true
