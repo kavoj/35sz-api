@@ -31,6 +31,26 @@ func SetVideoRouter(router *gin.Engine) {
 		videoV1Router.GET("/videos/:task_id", controller.RelayTaskFetch)
 	}
 
+	// Volcengine-native compatibility routes.
+	//
+	// The Volcengine Ark SDK targets `/api/v3/contents/generations/tasks`
+	// directly instead of the OpenAI-style `/v1/video/generations`. We
+	// expose the native path so admins who already have SDK-based clients
+	// (or third-party dashboards testing against Volcengine's expected
+	// URL layout) can point them at this gateway with `base_url =
+	// https://gateway.example/api/v3` and reach doubao-seedance / veo etc.
+	// without rewriting client code.
+	//
+	// The doubao TaskAdaptor is selected automatically by model name via
+	// the Distribute middleware — same code path as the /v1/* routes.
+	volcV3Router := router.Group("/api/v3")
+	volcV3Router.Use(middleware.RouteTag("relay"))
+	volcV3Router.Use(middleware.TokenAuth(), middleware.Distribute())
+	{
+		volcV3Router.POST("/contents/generations/tasks", controller.RelayTask)
+		volcV3Router.GET("/contents/generations/tasks/:task_id", controller.RelayTaskFetch)
+	}
+
 	klingV1Router := router.Group("/kling/v1")
 	klingV1Router.Use(middleware.RouteTag("relay"))
 	klingV1Router.Use(middleware.KlingRequestConvert(), middleware.TokenAuth(), middleware.Distribute())
