@@ -324,6 +324,18 @@ func RequestEpay(c *gin.Context) {
 		PaymentProvider: model.PaymentProviderEpay,
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
+		// PR-4 快照：把当前的汇率 / 溢价 / QuotaPerUnit 冻结到订单行。
+		// Amount 已在上面归一化为 USD 数量 (amount = TOKENS mode 时除以
+		// QuotaPerUnit, 其他 mode 保持原值)。payMoney 是当前显示币种下
+		// 用户实际支付的金额 (对国内用户 = CNY)。
+		//
+		// 反查公式：PaymentAmountCNY = AmountUSDSnapshot × USDExchangeRateSnapshot × RechargePremiumSnapshot
+		// 用于对账时确认 admin 后续改汇率 / 溢价不会影响历史结算。
+		AmountUSDSnapshot:       float64(amount),
+		PaymentAmountCNY:        payMoney,
+		USDExchangeRateSnapshot: operation_setting.USDExchangeRate,
+		RechargePremiumSnapshot: operation_setting.RechargePremium,
+		QuotaPerUnitSnapshot:    int64(common.QuotaPerUnit),
 	}
 	err = topUp.Insert()
 	if err != nil {
@@ -474,7 +486,12 @@ func EpayNotify(c *gin.Context) {
 				return
 			}
 			logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付 充值成功 trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q", topUp.TradeNo, topUp.UserId, c.ClientIP(), quotaToAdd, topUp.Money, common.GetJsonString(topUp)))
-			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "epay")
+			// PR-4: use the snapshot-aware log variant so ops dashboards can
+			// reconcile CNY charges without regex-parsing the Chinese Content.
+			// The `recharge` block in the log's `Other` JSON carries the same
+			// USDExchangeRate / RechargePremium / QuotaPerUnit snapshots that
+			// live on the TopUp row.
+			model.RecordTopupLogWithSnapshot(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "epay", topUp)
 			// Fire commission recording asynchronously so any downstream bug
 			// can never stall the payment callback.
 			go commission.OnTopupCompleted(topUp)

@@ -17,6 +17,24 @@ var Price = 7.3
 var MinTopUp = 1
 var USDExchangeRate = 7.3
 
+// RechargePremium is the platform's surcharge multiplier applied on top of
+// USDExchangeRate at recharge time. Introduced by PR-4 (CNY reconciliation)
+// to make the historically-conflated "Price" concept explicit:
+//
+//	Price effective for recharge  =  USDExchangeRate * RechargePremium
+//
+// Default 1.0 means "no premium, charge at the raw exchange rate". Setting
+// it to 1.05 collects a 5% platform fee on top of the market rate. This
+// value is snapshotted on the TopUp row at payment time so historical
+// reconciliation is unaffected by later admin changes.
+//
+// Historically, `Price` and `USDExchangeRate` were two independent settings
+// both defaulting to 7.3, and drift between them silently leaked CNY (see
+// db-currency-storage-audit report). RechargePremium replaces the implicit
+// divergence with a first-class field the admin can see and reason about.
+var RechargePremium = 1.0
+
+
 var PayMethods = []map[string]string{
 	{
 		"name": "支付宝",

@@ -252,6 +252,19 @@ func RecordOperationAuditLog(logUserId int, content string, ip string, action st
 }
 
 func RecordTopupLog(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
+	RecordTopupLogWithSnapshot(userId, content, callerIp, paymentMethod, callbackPaymentMethod, nil)
+}
+
+// RecordTopupLogWithSnapshot is the reconciliation-friendly variant of
+// RecordTopupLog. When `snapshot` is non-nil, we fold its structured fields
+// (amount USD, payment CNY, rate snapshots, quota credited) into the log's
+// `Other` JSON blob under the key `recharge`. Ops dashboards can then
+// aggregate charges without regex-parsing the Chinese `Content` string.
+//
+// The old signature (without snapshot) still works — legacy callers keep
+// their pre-PR-4 behavior. New paths that want a reconciliation trail
+// should call this variant directly.
+func RecordTopupLogWithSnapshot(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string, snapshot *TopUp) {
 	username, _ := GetUsernameById(userId, false)
 	adminInfo := map[string]interface{}{
 		"server_ip":               common.GetIp(),
@@ -263,6 +276,21 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 	other := map[string]interface{}{
 		"admin_info": adminInfo,
+	}
+	if snapshot != nil {
+		// Structured recharge block for reconciliation. Fields match
+		// the TopUp table 1:1 so an ops dashboard can aggregate without
+		// hitting `top_ups` directly (logs are the audit-of-record).
+		other["recharge"] = map[string]interface{}{
+			"trade_no":                   snapshot.TradeNo,
+			"payment_method":             snapshot.PaymentMethod,
+			"payment_provider":           snapshot.PaymentProvider,
+			"amount_usd_snapshot":        snapshot.AmountUSDSnapshot,
+			"payment_amount_cny":         snapshot.PaymentAmountCNY,
+			"usd_exchange_rate_snapshot": snapshot.USDExchangeRateSnapshot,
+			"recharge_premium_snapshot":  snapshot.RechargePremiumSnapshot,
+			"quota_per_unit_snapshot":    snapshot.QuotaPerUnitSnapshot,
+		}
 	}
 	log := &Log{
 		UserId:    userId,

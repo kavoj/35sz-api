@@ -23,6 +23,21 @@ type TopUp struct {
 	CreateTime      int64   `json:"create_time"`
 	CompleteTime    int64   `json:"complete_time"`
 	Status          string  `json:"status"`
+
+	// PR-4 CNY 对账加固：以下 5 列在 TopUp 行创建时（controller/topup.go
+	// 内的支付发起分支）由系统设置快照。老行未回填，仍为 0；查询时用
+	// COALESCE 或应用层容错。
+	//
+	// 语义：
+	//   PaymentAmountCNY = AmountUSDSnapshot * USDExchangeRateSnapshot * RechargePremiumSnapshot
+	//
+	// 任何一笔历史订单都可以按快照值独立复算，不受后续 admin 改动汇率
+	// 或溢价的影响。数据类型使用 decimal 避免 float 累加漂移。
+	AmountUSDSnapshot       float64 `json:"amount_usd_snapshot,omitempty" gorm:"type:decimal(12,4);default:0"`
+	PaymentAmountCNY        float64 `json:"payment_amount_cny,omitempty" gorm:"type:decimal(12,2);default:0"`
+	USDExchangeRateSnapshot float64 `json:"usd_exchange_rate_snapshot,omitempty" gorm:"type:decimal(10,4);default:0"`
+	RechargePremiumSnapshot float64 `json:"recharge_premium_snapshot,omitempty" gorm:"type:decimal(6,4);default:1"`
+	QuotaPerUnitSnapshot    int64   `json:"quota_per_unit_snapshot,omitempty" gorm:"default:0"`
 }
 
 const (
@@ -55,9 +70,56 @@ var (
 )
 
 func (topUp *TopUp) Insert() error {
-	var err error
-	err = DB.Create(topUp).Error
-	return err
+	// PR-4: back-fill any snapshot columns the caller didn't set. This is
+	// the safety net for the 7 controllers that create TopUp rows; each of
+	// them should call SnapshotCurrencyForInsert() explicitly (for clarity),
+	// but if any path forgets, the Insert still writes today's snapshot
+	// rather than 0. Existing zero-value snapshots on legacy rows are left
+	// alone — SnapshotCurrencyForInsert only fires here when all 4 rate
+	// fields are still zero (i.e. never populated).
+	if topUp.USDExchangeRateSnapshot == 0 &&
+		topUp.RechargePremiumSnapshot == 0 &&
+		topUp.QuotaPerUnitSnapshot == 0 {
+		topUp.SnapshotCurrencyForInsert()
+	}
+	// Backfill AmountUSDSnapshot / PaymentAmountCNY from the legacy fields
+	// so admins auditing recent TopUps see coherent snapshots even for
+	// providers whose controller hasn't been updated to set them explicitly.
+	// The values might be off for edge cases (e.g. Creem stores tokens in
+	// Amount rather than USD dollars) — those paths should set the snapshot
+	// fields explicitly, but this backfill keeps reconciliation tolerable
+	// in the meantime.
+	if topUp.AmountUSDSnapshot == 0 && topUp.Amount > 0 {
+		topUp.AmountUSDSnapshot = float64(topUp.Amount)
+	}
+	if topUp.PaymentAmountCNY == 0 && topUp.Money > 0 {
+		topUp.PaymentAmountCNY = topUp.Money
+	}
+	return DB.Create(topUp).Error
+}
+
+// SnapshotCurrencyForInsert freezes the current exchange rate, recharge
+// premium, and quota-per-unit onto the TopUp row so historical reconciliation
+// is decoupled from later admin setting changes. Idempotent — safe to call
+// twice; the second call just overwrites with the same values (or with
+// updated ones if the admin changed settings between calls, which the
+// caller usually doesn't want).
+//
+// Reconciliation invariant:
+//
+//	PaymentAmountCNY  ==  AmountUSDSnapshot
+//	                    * USDExchangeRateSnapshot
+//	                    * RechargePremiumSnapshot
+//	                    (within decimal precision)
+//
+// Callers should populate `AmountUSDSnapshot` and `PaymentAmountCNY` prior
+// to calling this — they're the payment-flow-specific values (in
+// controller/topup.go the caller has them right there as `amount` and
+// `payMoney`).
+func (topUp *TopUp) SnapshotCurrencyForInsert() {
+	topUp.USDExchangeRateSnapshot = operation_setting.USDExchangeRate
+	topUp.RechargePremiumSnapshot = operation_setting.RechargePremium
+	topUp.QuotaPerUnitSnapshot = int64(common.QuotaPerUnit)
 }
 
 func (topUp *TopUp) Update() error {
