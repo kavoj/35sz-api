@@ -1,0 +1,214 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/**
+ * Pricing schema — the frontend-side mapping of `pricing_kind` → drawer
+ * field set + display units. Mirrors constant/pricing.go on the backend;
+ * every string constant here MUST match the backend enum exactly, because
+ * it's persisted on `model_meta.pricing_kind`.
+ *
+ * Design intent: the drawer looks at the current pricing_kind (either
+ * auto-inferred from pipeline_tag or explicitly picked by the admin) and
+ * renders ONLY the fields that make sense for that kind. Video models see
+ * `$/秒 × 分辨率倍率`, image models see `$/张`, whisper sees `$/分钟`, etc.
+ */
+
+import type { HFPipelineTag } from './hf-taxonomy'
+
+// -----------------------------------------------------------------------------
+// PricingKind — 1:1 with constant/pricing.go
+// -----------------------------------------------------------------------------
+
+export const PRICING_KINDS = [
+  'chat',
+  'multimodal-chat',
+  'image-gen',
+  'video-gen',
+  'audio-in',
+  'audio-out',
+  'embedding',
+] as const
+
+export type PricingKind = (typeof PRICING_KINDS)[number]
+
+/**
+ * Normalize an incoming string into a valid PricingKind. Empty / unknown
+ * values fall back to "chat" to match the backend's
+ * constant.NormalizePricingKind.
+ */
+export function normalizePricingKind(kind: string | null | undefined): PricingKind {
+  if (typeof kind !== 'string') return 'chat'
+  return (PRICING_KINDS as readonly string[]).includes(kind)
+    ? (kind as PricingKind)
+    : 'chat'
+}
+
+// -----------------------------------------------------------------------------
+// pipeline_tag → pricing_kind mapping
+// -----------------------------------------------------------------------------
+//
+// Used to auto-populate the KindSelector when the admin types a model name.
+// The admin can always override via the dropdown, so this is a best-guess
+// starting point, not a hard rule.
+
+export const PIPELINE_TAG_TO_KIND: Record<HFPipelineTag, PricingKind> = {
+  // Multimodal
+  'image-text-to-text': 'multimodal-chat',
+  'video-text-to-text': 'multimodal-chat',
+  'visual-question-answering': 'multimodal-chat',
+  'document-question-answering': 'multimodal-chat',
+  'any-to-any': 'multimodal-chat',
+  // Vision
+  'text-to-image': 'image-gen',
+  'image-to-image': 'image-gen',
+  'text-to-video': 'video-gen',
+  'image-to-video': 'video-gen',
+  'video-to-video': 'video-gen',
+  'image-to-text': 'multimodal-chat',
+  'image-classification': 'chat',
+  // NLP
+  'text-generation': 'chat',
+  'text2text-generation': 'chat',
+  translation: 'chat',
+  summarization: 'chat',
+  'feature-extraction': 'embedding',
+  'sentence-similarity': 'embedding',
+  'text-ranking': 'embedding',
+  'question-answering': 'chat',
+  'fill-mask': 'chat',
+  'token-classification': 'chat',
+  // Audio
+  'text-to-speech': 'audio-out',
+  'automatic-speech-recognition': 'audio-in',
+  'audio-to-audio': 'audio-out',
+  'text-to-audio': 'audio-out',
+  'audio-classification': 'audio-in',
+  // Tabular / other → default to chat
+  'tabular-classification': 'chat',
+  'time-series-forecasting': 'chat',
+  other: 'chat',
+}
+
+// -----------------------------------------------------------------------------
+// Schema field descriptor — used to render the drawer's per-kind field set
+// -----------------------------------------------------------------------------
+
+export type PricingSchemaField =
+  // Legacy token-based fields (from Chat schema)
+  | 'ratio'
+  | 'completionRatio'
+  | 'cacheRatio'
+  | 'imageRatio' // multimodal-chat only
+  | 'audioRatio' // multimodal-chat only
+  | 'audioCompletionRatio' // multimodal-chat only
+  // Structured pricing fields
+  | 'imagePricePerImage'
+  | 'imageQualityMultipliers'
+  | 'imageSizeMultipliers'
+  | 'videoPricePerSecond'
+  | 'videoResolutionMultipliers'
+  | 'videoHasAudioMultiplier'
+  | 'audioInPricePerMinute'
+  | 'audioInMinBillMinutes'
+  | 'audioOutPricePerMillionChars'
+  | 'audioOutVoiceMultipliers'
+
+/**
+ * Field membership per schema. Any field NOT in the returned array is
+ * hidden by the drawer. The order in each list drives the vertical
+ * rendering order (basic first, multipliers after).
+ */
+export function getSchemaFields(kind: PricingKind): PricingSchemaField[] {
+  switch (kind) {
+    case 'chat':
+      return ['ratio', 'completionRatio', 'cacheRatio']
+    case 'multimodal-chat':
+      return [
+        'ratio',
+        'completionRatio',
+        'cacheRatio',
+        'imageRatio',
+        'audioRatio',
+        'audioCompletionRatio',
+      ]
+    case 'image-gen':
+      return [
+        'imagePricePerImage',
+        'imageQualityMultipliers',
+        'imageSizeMultipliers',
+      ]
+    case 'video-gen':
+      return [
+        'videoPricePerSecond',
+        'videoResolutionMultipliers',
+        'videoHasAudioMultiplier',
+      ]
+    case 'audio-in':
+      return ['audioInPricePerMinute', 'audioInMinBillMinutes']
+    case 'audio-out':
+      return ['audioOutPricePerMillionChars', 'audioOutVoiceMultipliers']
+    case 'embedding':
+      return ['ratio']
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Unit labels — displayed next to price inputs so admins know what unit they're
+// entering. Kept as English source strings; locale JSON provides the display.
+// -----------------------------------------------------------------------------
+
+export function getPriceUnitKey(kind: PricingKind): string {
+  switch (kind) {
+    case 'chat':
+    case 'multimodal-chat':
+    case 'embedding':
+      return 'per 1M tokens'
+    case 'image-gen':
+      return 'per image'
+    case 'video-gen':
+      return 'per second'
+    case 'audio-in':
+      return 'per minute'
+    case 'audio-out':
+      return 'per 1M characters'
+  }
+}
+
+/**
+ * Human-friendly label for the schema itself (used in the KindSelector
+ * dropdown). Not the same as the pipeline_tag label — this is admin-facing
+ * language about "how billing works" rather than "what the model does".
+ */
+export function getKindLabelKey(kind: PricingKind): string {
+  switch (kind) {
+    case 'chat':
+      return 'Chat (per-token)'
+    case 'multimodal-chat':
+      return 'Multimodal chat (per-token, with image/audio input)'
+    case 'image-gen':
+      return 'Image generation (per-image)'
+    case 'video-gen':
+      return 'Video generation (per-second)'
+    case 'audio-in':
+      return 'Speech recognition (per-minute)'
+    case 'audio-out':
+      return 'Speech synthesis (per-1M-characters)'
+    case 'embedding':
+      return 'Embedding / Reranking (per-token, input only)'
+  }
+}

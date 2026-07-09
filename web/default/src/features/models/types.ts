@@ -52,6 +52,17 @@ export interface Model {
   endpoints?: string
   status: number
   sync_official: number
+  /**
+   * PricingKind classifies the model's billing shape and selects the
+   * pricing schema shown in the edit drawer. Backed by `model_meta.pricing_kind`.
+   * Empty / undefined is treated as "chat" by both the backend
+   * (constant.NormalizePricingKind) and the frontend schema resolver.
+   *
+   * Valid values live in the constant/pricing.go enum:
+   *   chat / multimodal-chat / image-gen / video-gen /
+   *   audio-in / audio-out / embedding
+   */
+  pricing_kind?: string
   created_time: number
   updated_time: number
   name_rule: number
