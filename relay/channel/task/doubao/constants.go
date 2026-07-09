@@ -1,6 +1,10 @@
 package doubao
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
+)
 
 var ModelList = []string{
 	"doubao-seedance-1-0-pro-250528",
@@ -40,7 +44,18 @@ var videoPriceTable = map[string]map[videoPriceKey]float64{
 
 // GetVideoInputRatio 返回指定模型在给定输出分辨率/是否含视频输入下，相对基准价的计费倍率。
 // 第二个返回值表示该模型是否配置了价格表；倍率为 1.0 时调用方可忽略该 OtherRatio。
+//
+// PR-2 分辨率维度接入 admin-configurable ratio_setting.VideoPricing：当
+// hasVideo == false（纯文本→视频，最常见的场景）且管理员在 UI 里为该模型
+// 配置了 ResolutionMultipliers，就走 admin 值。带视频输入 (hasVideo=true)
+// 的档位仍走硬编码 videoPriceTable —— admin UI 目前没有暴露这个二维维度，
+// 强行覆盖会造成计费歧义；PR-5 会把 hasVideo 提升为一等公民再打通。
 func GetVideoInputRatio(modelName, resolution string, hasVideo bool) (float64, bool) {
+	if !hasVideo {
+		if mult, ok := ratio_setting.ResolutionMultiplier(modelName, resolution); ok {
+			return mult, true
+		}
+	}
 	prices, ok := videoPriceTable[modelName]
 	base := prices[videoPriceKey{}] // 零值键 = {480p/720p, 不含视频} 基准价
 	if !ok || base <= 0 {

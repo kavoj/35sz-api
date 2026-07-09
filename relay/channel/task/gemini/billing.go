@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
 // ParseVeoDurationSeconds extracts durationSeconds from metadata.
@@ -124,7 +125,22 @@ func SizeToVeoAspectRatio(size string) string {
 // VeoResolutionRatio returns the pricing multiplier for the given resolution.
 // Standard resolutions (720p, 1080p) return 1.0.
 // 4K returns a model-specific multiplier based on Google's official pricing.
+//
+// Lookup order (PR-2):
+//  1. Admin-configured ratio_setting.VideoPricing[modelName].ResolutionMultipliers
+//     — set via the /models/metadata drawer or bulk pricing sync.
+//  2. Hardcoded fallback below, kept in sync with the seed data in
+//     setting/ratio_setting/video_pricing.go so admins who never touch the
+//     UI get identical behavior.
+//
+// The admin path lets operators tune 4K uplift (or add new resolutions like
+// 8k or 2k) without shipping a new binary. The hardcoded path is the safety
+// net — it fires when Ark deployments are still on their first startup
+// before ImportRatioSettings has populated the map.
 func VeoResolutionRatio(modelName, resolution string) float64 {
+	if mult, ok := ratio_setting.ResolutionMultiplier(modelName, resolution); ok {
+		return mult
+	}
 	if resolution != "4k" {
 		return 1.0
 	}

@@ -194,6 +194,20 @@ func SeedDefaultVideoPricing() {
 	}
 }
 
+// ClearVideoPricingForTest is exposed for cross-package tests that need to
+// reset the runtime map between cases. It has no callers in production
+// code — the naming makes that clear so future readers don't wire it in.
+func ClearVideoPricingForTest() {
+	videoPricingMap.Clear()
+}
+
+// SetVideoPricingForTest is a test-only convenience that upserts a single
+// entry and returns nil for uniform assert.NoError usage in table tests.
+func SetVideoPricingForTest(name string, pricing VideoPricing) error {
+	videoPricingMap.Set(name, pricing)
+	return nil
+}
+
 // videoPricingHardcodedFallback is called by the billing layer when neither
 // the admin-configured map nor the seed data has an entry. Returns the
 // pre-refactor hardcoded ratio (from VeoResolutionRatio for the Veo family,
