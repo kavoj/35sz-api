@@ -150,6 +150,15 @@ func InitOptionMap() {
 	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
 	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
+	// Structured pricing tables introduced with the pricing_kind refactor.
+	// Distinct from ImageRatio/AudioRatio (which express multipliers on
+	// chat-embedded modality tokens); these carry native units — $/image,
+	// $/second, $/minute, $/1M chars — for models billed outside the token
+	// abstraction. See setting/ratio_setting/{image,video,audio_in,audio_out}_pricing.go.
+	common.OptionMap["ImagePricing"] = ratio_setting.ImagePricing2JSONString()
+	common.OptionMap["VideoPricing"] = ratio_setting.VideoPricing2JSONString()
+	common.OptionMap["AudioInPricing"] = ratio_setting.AudioInPricing2JSONString()
+	common.OptionMap["AudioOutPricing"] = ratio_setting.AudioOutPricing2JSONString()
 	common.OptionMap["TopUpLink"] = common.TopUpLink
 	//common.OptionMap["ChatLink"] = common.ChatLink
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
@@ -546,6 +555,14 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateAudioRatioByJSONString(value)
 	case "AudioCompletionRatio":
 		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(value)
+	case "ImagePricing":
+		err = ratio_setting.UpdateImagePricingByJSONString(value)
+	case "VideoPricing":
+		err = ratio_setting.UpdateVideoPricingByJSONString(value)
+	case "AudioInPricing":
+		err = ratio_setting.UpdateAudioInPricingByJSONString(value)
+	case "AudioOutPricing":
+		err = ratio_setting.UpdateAudioOutPricingByJSONString(value)
 	case "TopUpLink":
 		common.TopUpLink = value
 	//case "ChatLink":

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 
 	"gorm.io/gorm"
 )
@@ -58,6 +59,13 @@ type Model struct {
 	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
+	// PricingKind classifies the model's billing shape. See constant/pricing.go
+	// for the enum. Empty string is treated as PricingKindChat by the billing
+	// layer so legacy rows keep their existing per-token behavior. The gorm
+	// default only fires on new inserts through raw SQL — every Insert /
+	// Update path in this file normalizes the value explicitly to survive
+	// GORM's "zero-value skip" semantics.
+	PricingKind  string         `json:"pricing_kind,omitempty" gorm:"type:varchar(32);default:'chat'"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
 	UpdatedTime  int64          `json:"updated_time" gorm:"bigint"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_model_name_delete_at,priority:2"`
@@ -83,6 +91,9 @@ func (mi *Model) Insert() error {
 	originalSyncOfficial := mi.SyncOfficial
 
 	mi.ModelType = NormalizeModelType(mi.ModelType)
+	// Coerce pricing_kind at the insert boundary so downstream code can
+	// safely switch on it. Empty / invalid values become PricingKindChat.
+	mi.PricingKind = constant.NormalizePricingKind(mi.PricingKind)
 
 	// 先创建记录（GORM 会对零值字段应用默认值）
 	if err := DB.Create(mi).Error; err != nil {
@@ -93,6 +104,7 @@ func (mi *Model) Insert() error {
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).Updates(map[string]interface{}{
 		"status":        originalStatus,
 		"sync_official": originalSyncOfficial,
+		"pricing_kind":  mi.PricingKind,
 	}).Error
 }
 
@@ -108,9 +120,10 @@ func IsModelNameDuplicated(id int, name string) (bool, error) {
 func (mi *Model) Update() error {
 	mi.UpdatedTime = common.GetTimestamp()
 	mi.ModelType = NormalizeModelType(mi.ModelType)
+	mi.PricingKind = constant.NormalizePricingKind(mi.PricingKind)
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "model_type", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "context_length", "updated_time").
+		Select("model_name", "description", "icon", "tags", "model_type", "vendor_id", "endpoints", "status", "sync_official", "pricing_kind", "name_rule", "context_length", "updated_time").
 		Updates(mi).Error
 }
 
