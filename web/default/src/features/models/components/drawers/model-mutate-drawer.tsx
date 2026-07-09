@@ -118,6 +118,7 @@ import {
   getGroupLabelKey,
   getPipelineTagLabelKey,
 } from '../../lib/hf-taxonomy'
+import { pipelineTagToModelType } from '../../lib/pricing-schema'
 import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
 import { OfficialPricingReference } from '../pricing/official-pricing-reference'
@@ -134,6 +135,12 @@ const extendedModelFormSchema = z.object({
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
+  /**
+   * Persisted model_type — drives the /models/metadata list filter. Auto-
+   * inferred from pipeline_tag when creating a new model; editable in the
+   * drawer if the admin disagrees. Falls back to "text" when unset.
+   */
+  model_type: z.enum(['text', 'image', 'video', 'audio', 'embedding', 'file']),
   context_length: z.number().optional(),
   price: z.string().optional(),
   ratio: z.string().optional(),
@@ -350,6 +357,46 @@ export function ModelMutateDrawer({
     }
   }, [autoMatchedVendorId, open, form])
 
+  // model_type auto-inference from pipeline_tag.
+  //
+  // Historically model_type came out of createModel as the backend's default
+  // "text" for every new model, forcing admins to open a separate UI to
+  // reclassify image / video / audio / embedding models. The drawer now
+  // pipes inferredDefaults.pipelineTag through pipelineTagToModelType to
+  // pre-fill the field on:
+  //   1. new-model create when the admin has typed a recognizable name
+  //   2. edit-model view when the persisted model_type is empty (legacy
+  //      rows that predate this feature)
+  //
+  // Once the admin picks any value manually (or an existing model already
+  // has model_type != 'text'), we stop touching it — mirrors the same
+  // "don't overwrite explicit choice" guarantee the vendor auto-match uses.
+  const lastAutoModelTypeRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!open) return
+    if (inferredDefaults.source === 'fallback') {
+      lastAutoModelTypeRef.current = undefined
+      return
+    }
+    const inferredType = pipelineTagToModelType(inferredDefaults.pipelineTag)
+    const current = form.getValues('model_type')
+    if (!current || current === 'text') {
+      // Never had an explicit value — safe to write.
+      form.setValue('model_type', inferredType, { shouldDirty: true })
+      lastAutoModelTypeRef.current = inferredType
+      return
+    }
+    // Track subsequent auto-changes only when the previous auto-value is
+    // what the field currently holds (i.e. admin hasn't overridden).
+    if (
+      current === lastAutoModelTypeRef.current &&
+      lastAutoModelTypeRef.current !== inferredType
+    ) {
+      form.setValue('model_type', inferredType, { shouldDirty: true })
+      lastAutoModelTypeRef.current = inferredType
+    }
+  }, [inferredDefaults.pipelineTag, inferredDefaults.source, open, form])
+
   // Sort vendors by usage and display name
   const sortedVendors = useMemo(() => {
     // Calculate vendor usage
@@ -516,6 +563,9 @@ export function ModelMutateDrawer({
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
+        model_type: (model.model_type || 'text') as z.infer<
+          typeof extendedModelFormSchema
+        >['model_type'],
         context_length: model.context_length,
         price: '',
         ratio: '',
@@ -628,6 +678,11 @@ export function ModelMutateDrawer({
         name_rule: 0,
         status: true,
         sync_official: true,
+        // model_type default is derived below from pipeline_tag inference
+        // (see `inferredDefaults` useMemo). Start with 'text' so the field
+        // has a valid value before the effect fires; the auto-inference
+        // effect overrides it when a model name is present.
+        model_type: 'text',
         context_length: undefined,
         price: '',
         ratio: '',
@@ -1284,6 +1339,49 @@ export function ModelMutateDrawer({
                     <FormDescription>
                       {t(
                         'Maximum context tokens supported by this model (e.g. 128000).'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Model type — pre-filled from pipeline_tag inference (see
+                * the model_type auto-inference useEffect above). Admin can
+                * still override if the inference is wrong (a vision model
+                * that primarily produces text descriptions might legitimately
+                * be classified as `text` for filtering purposes). */}
+              <FormField
+                control={form.control}
+                name='model_type'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Model type')}</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value='text'>{t('Text')}</SelectItem>
+                            <SelectItem value='image'>{t('Image')}</SelectItem>
+                            <SelectItem value='video'>{t('Video')}</SelectItem>
+                            <SelectItem value='audio'>{t('Audio')}</SelectItem>
+                            <SelectItem value='embedding'>
+                              {t('Embedding')}
+                            </SelectItem>
+                            <SelectItem value='file'>{t('File')}</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.'
                       )}
                     </FormDescription>
                     <FormMessage />

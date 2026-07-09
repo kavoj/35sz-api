@@ -212,3 +212,73 @@ export function getKindLabelKey(kind: PricingKind): string {
       return 'Embedding / Reranking (per-token, input only)'
   }
 }
+
+// -----------------------------------------------------------------------------
+// pipeline_tag → Model.model_type mapping
+// -----------------------------------------------------------------------------
+//
+// `model_type` is a separate persisted field on the model row (independent of
+// tags and pricing_kind) that drives table filtering. Historically it had to
+// be picked manually by the admin; nothing auto-derived it. This mapping lets
+// the drawer infer a sensible default when the admin types a new model name,
+// so `doubao-seedream-5.0-lite` doesn't land on the default `text` while its
+// suggestion chip screams "image".
+//
+// Kept as a small function (not a Record<>) so unknown HFPipelineTag values
+// fall through to `text` explicitly rather than surfacing `undefined`.
+
+export type ModelTypeCode =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'embedding'
+  | 'file'
+
+export function pipelineTagToModelType(tag: HFPipelineTag): ModelTypeCode {
+  switch (tag) {
+    // Vision generation → image or video
+    case 'text-to-image':
+    case 'image-to-image':
+      return 'image'
+    case 'text-to-video':
+    case 'image-to-video':
+    case 'video-to-video':
+      return 'video'
+    // Vision analysis → image (bytes are image; classification/OCR)
+    case 'image-classification':
+    case 'image-to-text':
+      return 'image'
+    // Audio in/out
+    case 'text-to-speech':
+    case 'automatic-speech-recognition':
+    case 'audio-to-audio':
+    case 'text-to-audio':
+    case 'audio-classification':
+      return 'audio'
+    // Embedding family
+    case 'feature-extraction':
+    case 'sentence-similarity':
+    case 'text-ranking':
+      return 'embedding'
+    // Multimodal chat / VQA — the primary output is text, so keep as text
+    // even though the model consumes images. Admins can override to `image`
+    // if they filter their table on capability rather than output modality.
+    case 'image-text-to-text':
+    case 'video-text-to-text':
+    case 'visual-question-answering':
+    case 'document-question-answering':
+    case 'any-to-any':
+    case 'text-generation':
+    case 'text2text-generation':
+    case 'translation':
+    case 'summarization':
+    case 'question-answering':
+    case 'fill-mask':
+    case 'token-classification':
+    case 'tabular-classification':
+    case 'time-series-forecasting':
+    case 'other':
+      return 'text'
+  }
+}
