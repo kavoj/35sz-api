@@ -113,6 +113,11 @@ import {
   getPricingModeLabelKey,
   getPromptPriceLabelKey,
 } from '../../lib/pricing-currency-label'
+import { inferModelDefaults } from '../../lib/tag-inference'
+import {
+  getGroupLabelKey,
+  getPipelineTagLabelKey,
+} from '../../lib/hf-taxonomy'
 import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
 import { OfficialPricingReference } from '../pricing/official-pricing-reference'
@@ -288,6 +293,35 @@ export function ModelMutateDrawer({
     )
     return match?.id
   }, [iconValue, modelNameValue, vendors])
+
+  // 依据模型名推断的建议标签与上下文长度（不主动写入，仅提示）
+  const currentTagsValue = form.watch('tags') || []
+  const currentContextValue = form.watch('context_length')
+  const inferredDefaults = useMemo(
+    () => inferModelDefaults(modelNameValue || ''),
+    [modelNameValue]
+  )
+  const suggestedTags = useMemo(
+    () => inferredDefaults.tags.filter((t) => !currentTagsValue.includes(t)),
+    [inferredDefaults.tags, currentTagsValue]
+  )
+  const suggestedContext = inferredDefaults.context
+  // Show the suggestion panel when:
+  //   a) creating a new model AND the name yielded any signal at all (either
+  //      a confident pipeline_tag from the registry / regex, or a context
+  //      guess, or extra legacy tags), OR
+  //   b) editing an existing model that has no tags AND no context yet — in
+  //      that case the panel only appears if we actually have something new
+  //      to offer.
+  const hasAnySignal =
+    inferredDefaults.source !== 'fallback' ||
+    suggestedTags.length > 0 ||
+    suggestedContext !== undefined
+  const showSuggestions =
+    modelNameValue.trim().length > 0 &&
+    hasAnySignal &&
+    (!isEditing || (currentTagsValue.length === 0 && !currentContextValue))
+
 
   // 当图标或模型名变化导致自动匹配结果变化时，自动写入 vendor_id。
   // 用户仍可通过下拉框手动改回；只在自动匹配结果切换时更新，避免抹掉手动选择。
@@ -1049,6 +1083,128 @@ export function ModelMutateDrawer({
                   </FormItem>
                 )}
               />
+
+              {/* Auto-inferred capability suggestions (from model_name).
+                * Shows only when: creating a new model, OR editing a model
+                * that has no tags AND no context length yet. Clicking a chip
+                * appends the tag / sets the context — never overwrites what
+                * the admin already picked. */}
+              {showSuggestions && (
+                <div className='bg-muted/40 flex flex-col gap-2 rounded-md border p-3 text-sm'>
+                  <div className='flex items-center justify-between gap-2'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <span className='text-muted-foreground text-xs font-medium'>
+                        {t('Suggested from model name')}
+                      </span>
+                      {/* HF-style pipeline_tag chip: shows the primary
+                        * classification ("Text → Image", "Image + Text →
+                        * Text", ...) plus its HF super-group as a subtle
+                        * secondary label. Two shades of the same accent
+                        * keep the chip readable next to the plain tag
+                        * pills below. */}
+                      <span
+                        className='border-primary/30 bg-primary/5 text-primary inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium'
+                        title={t(getGroupLabelKey(inferredDefaults.group))}
+                      >
+                        {t(getPipelineTagLabelKey(inferredDefaults.pipelineTag))}
+                        <span className='text-primary/60'>
+                          · {t(getGroupLabelKey(inferredDefaults.group))}
+                        </span>
+                      </span>
+                      {/* Placeholder for the future admin action that pulls a
+                        * fresh HF taxonomy snapshot. Rendered inline in the
+                        * one place admins already look at inference output, so
+                        * the flow is: "wrong guess? → sync taxonomy → retry."
+                        * The handler is deliberately a no-op-with-toast for
+                        * now; wiring to a real fetch happens in a follow-up. */}
+                      <button
+                        type='button'
+                        title={t(
+                          'Refresh the local Hugging Face taxonomy snapshot.'
+                        )}
+                        className='text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline'
+                        onClick={() => {
+                          toast.info(
+                            t(
+                              'Hugging Face taxonomy sync is coming soon. For now, edit web/default/src/features/models/lib/known-model-registry.ts to add a model.'
+                            )
+                          )
+                        }}
+                      >
+                        {t('Sync HF dictionary')}
+                      </button>
+                    </div>
+                    {(suggestedTags.length > 0 ||
+                      suggestedContext !== undefined) && (
+                      <button
+                        type='button'
+                        className='text-primary text-xs hover:underline'
+                        onClick={() => {
+                          if (suggestedTags.length > 0) {
+                            form.setValue(
+                              'tags',
+                              [...currentTagsValue, ...suggestedTags],
+                              { shouldDirty: true }
+                            )
+                          }
+                          if (
+                            suggestedContext !== undefined &&
+                            !currentContextValue
+                          ) {
+                            form.setValue('context_length', suggestedContext, {
+                              shouldDirty: true,
+                            })
+                          }
+                        }}
+                      >
+                        {t('Apply all')}
+                      </button>
+                    )}
+                  </div>
+                  <div className='flex flex-wrap gap-1'>
+                    {suggestedTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type='button'
+                        className='border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 rounded-full border px-2 py-0.5 text-xs transition-colors'
+                        onClick={() => {
+                          form.setValue('tags', [...currentTagsValue, tag], {
+                            shouldDirty: true,
+                          })
+                        }}
+                      >
+                        + {getTagLabel(t, tag)}
+                      </button>
+                    ))}
+                    {suggestedContext !== undefined &&
+                      !currentContextValue && (
+                        <button
+                          type='button'
+                          className='border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 rounded-full border px-2 py-0.5 text-xs transition-colors'
+                          onClick={() => {
+                            form.setValue('context_length', suggestedContext, {
+                              shouldDirty: true,
+                            })
+                          }}
+                        >
+                          + {t('Context')}:{' '}
+                          {suggestedContext >= 1_000_000
+                            ? `${suggestedContext / 1_000_000}M`
+                            : suggestedContext >= 1000
+                              ? `${suggestedContext / 1000}k`
+                              : String(suggestedContext)}
+                        </button>
+                      )}
+                    {suggestedTags.length === 0 &&
+                      (suggestedContext === undefined ||
+                        currentContextValue) && (
+                        <span className='text-muted-foreground text-xs'>
+                          {t('No suggestions for this name.')}
+                        </span>
+                      )}
+                  </div>
+                </div>
+              )}
 
               <FormField
                 control={form.control}
