@@ -342,6 +342,13 @@ func InitRatioSettings() {
 	imageRatioMap.AddAll(defaultImageRatio)
 	audioRatioMap.AddAll(defaultAudioRatio)
 	audioCompletionRatioMap.AddAll(defaultAudioCompletionRatio)
+	// Structured per-kind pricing seeds — introduced with pricing_kind. Each
+	// Seed* function is a no-op for names an admin has already customized in
+	// OptionMap, so calling these unconditionally is safe on hot restart.
+	SeedDefaultImagePricing()
+	SeedDefaultVideoPricing()
+	SeedDefaultAudioInPricing()
+	SeedDefaultAudioOutPricing()
 }
 
 func GetModelPriceMap() map[string]float64 {
