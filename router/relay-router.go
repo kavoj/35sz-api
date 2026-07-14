@@ -15,6 +15,19 @@ func SetRelayRouter(router *gin.Engine) {
 	router.Use(middleware.DecompressRequestMiddleware())
 	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	router.Use(middleware.StatsMiddleware())
+
+	// Machine-to-machine pricing sync endpoint. Registered BEFORE the /v1/models
+	// group so gin's static-route priority resolves `/v1/models/pricing` to
+	// this admin-only handler instead of the `/:model` retrieve route. Admin
+	// auth (session OR Authorization: Bearer <access-token>) — see PR-6
+	// (BuildingAI Agent integration).
+	pricingRouter := router.Group("/v1/models/pricing")
+	pricingRouter.Use(middleware.RouteTag("relay"))
+	pricingRouter.Use(middleware.AdminAuth())
+	{
+		pricingRouter.GET("", controller.GetModelsPricing)
+	}
+
 	// https://platform.openai.com/docs/api-reference/introduction
 	modelsRouter := router.Group("/v1/models")
 	modelsRouter.Use(middleware.RouteTag("relay"))
