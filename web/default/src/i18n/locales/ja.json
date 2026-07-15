@@ -5316,6 +5316,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "ボイス / クローンタイプごとの倍率 (例: \"clone\" = 2×)。未指定は 1。",
     "voice (e.g. nova)": "ボイス (例: nova)",
     "No entries — click below to add one.": "エントリなし — 下のボタンで追加してください。",
-    "Remove entry": "エントリ削除"
+    "Remove entry": "エントリ削除",
+    "Show only registered models": "登録済みモデルのみ表示",
+    "Per-image": "画像単位",
+    "Per-second": "秒単位",
+    "Per-minute": "分単位",
+    "Per-1M chars": "1M 文字あたり",
+    "Image generation billing": "画像生成の課金",
+    "Video generation billing": "動画生成の課金",
+    "Speech recognition billing": "音声認識の課金",
+    "Speech synthesis billing": "音声合成の課金",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "詳細な価格設定（基本価格 + 解像度 / 品質 / ボイス倍率）は Models → Metadata → Edit のドロワーで行ってください。このシートはトークン倍率調整専用です。",
+    "Base: $ / image": "基本: $ / 枚",
+    "Quality multipliers (hd, standard)": "品質倍率（hd / standard）",
+    "Size multipliers (1024x1024, 1024x1792)": "サイズ倍率（1024x1024 / 1024x1792）",
+    "Base: $ / second": "基本: $ / 秒",
+    "Resolution multipliers (720p, 1080p, 4k)": "解像度倍率（720p / 1080p / 4k）",
+    "Has-audio multiplier": "音声付き倍率",
+    "Base: $ / minute": "基本: $ / 分",
+    "Minimum billed minutes": "最小課金分数",
+    "Base: $ / 1M characters": "基本: $ / 1M 文字",
+    "Voice multipliers (nova, echo, ...)": "ボイス倍率（nova / echo …）"
   }
 }

@@ -99,7 +99,14 @@ type ModelPricingFormValues = z.infer<
   ReturnType<typeof createModelPricingSchema>
 >
 
-type PricingMode = 'per-token' | 'per-request' | 'tiered_expr'
+type PricingMode =
+  | 'per-token'
+  | 'per-request'
+  | 'tiered_expr'
+  | 'per-image'
+  | 'per-second'
+  | 'per-minute'
+  | 'per-1m-chars'
 type LaneKey =
   | 'completion'
   | 'cache'
@@ -825,13 +832,25 @@ export function ModelPricingEditorPanel({
               />
 
               <Tabs value={pricingMode} onValueChange={handleModeChange}>
-                <TabsList className='grid w-full grid-cols-3'>
+                <TabsList className='grid w-full grid-cols-4 gap-y-1 md:grid-cols-7'>
                   <TabsTrigger value='per-token'>{t('Per-token')}</TabsTrigger>
                   <TabsTrigger value='per-request'>
                     {t('Per-request')}
                   </TabsTrigger>
                   <TabsTrigger value='tiered_expr'>
                     {t('Expression')}
+                  </TabsTrigger>
+                  <TabsTrigger value='per-image'>
+                    {t('Per-image')}
+                  </TabsTrigger>
+                  <TabsTrigger value='per-second'>
+                    {t('Per-second')}
+                  </TabsTrigger>
+                  <TabsTrigger value='per-minute'>
+                    {t('Per-minute')}
+                  </TabsTrigger>
+                  <TabsTrigger value='per-1m-chars'>
+                    {t('Per-1M chars')}
                   </TabsTrigger>
                 </TabsList>
 
@@ -933,6 +952,81 @@ export function ModelPricingEditorPanel({
                     onRequestRuleExprChange={setRequestRuleExpr}
                   />
                 </TabsContent>
+
+                {/* Structured pricing modes (PR-7c). These four modes exist so
+                  * the admin can classify a model as image-gen / video-gen /
+                  * audio-in / audio-out from this sheet, but the actual
+                  * multi-field editor (base price + resolution/quality/size
+                  * multipliers) lives on the model-mutate drawer under
+                  * /models/metadata → Edit → Pricing Configuration. Keeping
+                  * both places aware of the same kind vocabulary means
+                  * switching a model here nudges the admin into the correct
+                  * detailed editor without duplicating that UI's complex
+                  * validation logic. */}
+                {(
+                  [
+                    'per-image',
+                    'per-second',
+                    'per-minute',
+                    'per-1m-chars',
+                  ] as const
+                ).map((mode) => (
+                  <TabsContent
+                    key={mode}
+                    value={mode}
+                    className='flex flex-col gap-4'
+                  >
+                    <div className='border-primary/30 bg-primary/5 rounded-md border p-4 text-sm'>
+                      <p className='font-medium'>
+                        {mode === 'per-image' &&
+                          t('Image generation billing')}
+                        {mode === 'per-second' &&
+                          t('Video generation billing')}
+                        {mode === 'per-minute' &&
+                          t('Speech recognition billing')}
+                        {mode === 'per-1m-chars' &&
+                          t('Speech synthesis billing')}
+                      </p>
+                      <p className='text-muted-foreground mt-1 text-xs leading-5'>
+                        {t(
+                          'Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.'
+                        )}
+                      </p>
+                      <ul className='text-muted-foreground mt-2 list-inside list-disc space-y-0.5 text-xs'>
+                        {mode === 'per-image' && (
+                          <>
+                            <li>{t('Base: $ / image')}</li>
+                            <li>{t('Quality multipliers (hd, standard)')}</li>
+                            <li>
+                              {t('Size multipliers (1024x1024, 1024x1792)')}
+                            </li>
+                          </>
+                        )}
+                        {mode === 'per-second' && (
+                          <>
+                            <li>{t('Base: $ / second')}</li>
+                            <li>
+                              {t('Resolution multipliers (720p, 1080p, 4k)')}
+                            </li>
+                            <li>{t('Has-audio multiplier')}</li>
+                          </>
+                        )}
+                        {mode === 'per-minute' && (
+                          <>
+                            <li>{t('Base: $ / minute')}</li>
+                            <li>{t('Minimum billed minutes')}</li>
+                          </>
+                        )}
+                        {mode === 'per-1m-chars' && (
+                          <>
+                            <li>{t('Base: $ / 1M characters')}</li>
+                            <li>{t('Voice multipliers (nova, echo, ...)')}</li>
+                          </>
+                        )}
+                      </ul>
+                    </div>
+                  </TabsContent>
+                ))}
               </Tabs>
 
               <Collapsible open={previewOpen} onOpenChange={setPreviewOpen}>

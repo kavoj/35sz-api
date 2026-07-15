@@ -5316,6 +5316,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "Мультипликатор по голосу / типу клона (напр. \"clone\" = 2×). Отсутствующие = 1.",
     "voice (e.g. nova)": "голос (напр. nova)",
     "No entries — click below to add one.": "Записей нет — нажмите ниже, чтобы добавить.",
-    "Remove entry": "Удалить запись"
+    "Remove entry": "Удалить запись",
+    "Show only registered models": "Показать только зарегистрированные модели",
+    "Per-image": "За изображение",
+    "Per-second": "За секунду",
+    "Per-minute": "За минуту",
+    "Per-1M chars": "За 1М символов",
+    "Image generation billing": "Тарификация генерации изображений",
+    "Video generation billing": "Тарификация генерации видео",
+    "Speech recognition billing": "Тарификация распознавания речи",
+    "Speech synthesis billing": "Тарификация синтеза речи",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "Настройте детальные цены (базовая цена + множители разрешения / качества / голоса) в панели Models → Metadata → Edit. Эта форма предназначена только для настройки коэффициентов по токенам.",
+    "Base: $ / image": "База: $ / изображение",
+    "Quality multipliers (hd, standard)": "Множители качества (hd, standard)",
+    "Size multipliers (1024x1024, 1024x1792)": "Множители размера (1024x1024, 1024x1792)",
+    "Base: $ / second": "База: $ / секунда",
+    "Resolution multipliers (720p, 1080p, 4k)": "Множители разрешения (720p, 1080p, 4k)",
+    "Has-audio multiplier": "Множитель со звуком",
+    "Base: $ / minute": "База: $ / минута",
+    "Minimum billed minutes": "Минимум оплачиваемых минут",
+    "Base: $ / 1M characters": "База: $ / 1М символов",
+    "Voice multipliers (nova, echo, ...)": "Множители голоса (nova, echo, ...)"
   }
 }

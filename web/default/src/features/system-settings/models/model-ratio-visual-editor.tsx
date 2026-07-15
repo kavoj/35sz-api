@@ -84,6 +84,23 @@ type ModelRatioVisualEditorProps = {
   billingMode: string
   billingExpr: string
   onChange: (field: string, value: string) => void
+  /**
+   * When true, hide model rows that only exist in the OptionMap but are
+   * NOT present in the `models` metadata table. Combined with
+   * `registeredModelNames`, this lets the admin focus on models they've
+   * intentionally added while keeping the underlying pricing OptionMap
+   * untouched (so re-enabling the filter reveals older entries again).
+   *
+   * See requirement R7a from PR-7c UX improvements.
+   */
+  filterAddedOnly?: boolean
+  /**
+   * Set of model names known to exist in the `models` metadata table.
+   * Passed down from the parent form which does the `getModels` API call.
+   * Absent (undefined) means "filter not applied" — the editor shows every
+   * row from the union of pricing OptionMap keys as before.
+   */
+  registeredModelNames?: ReadonlySet<string>
 }
 
 type ModelRow = {
@@ -212,6 +229,8 @@ export const ModelRatioVisualEditor = memo(
     billingMode,
     billingExpr,
     onChange,
+    filterAddedOnly,
+    registeredModelNames,
   }: ModelRatioVisualEditorProps) {
     const { t } = useTranslation()
     const isMobile = useMediaQuery('(max-width: 767px)')
@@ -384,7 +403,17 @@ export const ModelRatioVisualEditor = memo(
         }
       })
 
-      return modelData.sort((a, b) => a.name.localeCompare(b.name))
+      // Apply the "added only" filter. When the caller passes a registered
+      // model set AND opts in via filterAddedOnly, we drop any pricing-map-only
+      // rows so the admin sees only what they've explicitly registered in the
+      // models metadata table. Filter runs BEFORE sort so pagination pages
+      // reflect the visible slice.
+      const filtered =
+        filterAddedOnly && registeredModelNames
+          ? modelData.filter((row) => registeredModelNames.has(row.name))
+          : modelData
+
+      return filtered.sort((a, b) => a.name.localeCompare(b.name))
     }, [
       modelPrice,
       modelRatio,
@@ -396,6 +425,8 @@ export const ModelRatioVisualEditor = memo(
       audioCompletionRatio,
       billingMode,
       billingExpr,
+      filterAddedOnly,
+      registeredModelNames,
     ])
 
     const modeCounts = useMemo(

@@ -5316,6 +5316,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "Hệ số theo giọng / kiểu clone (ví dụ \"clone\" = 2×). Mục thiếu = 1.",
     "voice (e.g. nova)": "giọng (ví dụ nova)",
     "No entries — click below to add one.": "Không có mục nào — nhấn bên dưới để thêm.",
-    "Remove entry": "Xóa mục"
+    "Remove entry": "Xóa mục",
+    "Show only registered models": "Chỉ hiển thị mô hình đã đăng ký",
+    "Per-image": "Mỗi ảnh",
+    "Per-second": "Mỗi giây",
+    "Per-minute": "Mỗi phút",
+    "Per-1M chars": "Mỗi 1M ký tự",
+    "Image generation billing": "Tính phí tạo ảnh",
+    "Video generation billing": "Tính phí tạo video",
+    "Speech recognition billing": "Tính phí nhận dạng giọng nói",
+    "Speech synthesis billing": "Tính phí tổng hợp giọng nói",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "Cấu hình chi tiết giá (giá cơ sở + hệ số phân giải / chất lượng / giọng nói) tại ngăn Models → Metadata → Edit. Trang này chỉ dùng để chỉnh tỷ lệ theo token.",
+    "Base: $ / image": "Cơ sở: $ / ảnh",
+    "Quality multipliers (hd, standard)": "Hệ số chất lượng (hd, standard)",
+    "Size multipliers (1024x1024, 1024x1792)": "Hệ số kích thước (1024x1024, 1024x1792)",
+    "Base: $ / second": "Cơ sở: $ / giây",
+    "Resolution multipliers (720p, 1080p, 4k)": "Hệ số độ phân giải (720p, 1080p, 4k)",
+    "Has-audio multiplier": "Hệ số có âm thanh",
+    "Base: $ / minute": "Cơ sở: $ / phút",
+    "Minimum billed minutes": "Số phút tối thiểu tính phí",
+    "Base: $ / 1M characters": "Cơ sở: $ / 1M ký tự",
+    "Voice multipliers (nova, echo, ...)": "Hệ số giọng nói (nova, echo, ...)"
   }
 }

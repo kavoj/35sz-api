@@ -5365,6 +5365,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.",
     "voice (e.g. nova)": "voice (e.g. nova)",
     "No entries — click below to add one.": "No entries — click below to add one.",
-    "Remove entry": "Remove entry"
+    "Remove entry": "Remove entry",
+    "Show only registered models": "Show only registered models",
+    "Per-image": "Per-image",
+    "Per-second": "Per-second",
+    "Per-minute": "Per-minute",
+    "Per-1M chars": "Per-1M chars",
+    "Image generation billing": "Image generation billing",
+    "Video generation billing": "Video generation billing",
+    "Speech recognition billing": "Speech recognition billing",
+    "Speech synthesis billing": "Speech synthesis billing",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.",
+    "Base: $ / image": "Base: $ / image",
+    "Quality multipliers (hd, standard)": "Quality multipliers (hd, standard)",
+    "Size multipliers (1024x1024, 1024x1792)": "Size multipliers (1024x1024, 1024x1792)",
+    "Base: $ / second": "Base: $ / second",
+    "Resolution multipliers (720p, 1080p, 4k)": "Resolution multipliers (720p, 1080p, 4k)",
+    "Has-audio multiplier": "Has-audio multiplier",
+    "Base: $ / minute": "Base: $ / minute",
+    "Minimum billed minutes": "Minimum billed minutes",
+    "Base: $ / 1M characters": "Base: $ / 1M characters",
+    "Voice multipliers (nova, echo, ...)": "Voice multipliers (nova, echo, ...)"
   }
 }

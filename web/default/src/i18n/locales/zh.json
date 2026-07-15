@@ -5386,6 +5386,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "每种音色 / 克隆类型的倍率 (如 \"clone\" = 2×)。未填写的项默认为 1。",
     "voice (e.g. nova)": "音色 (如 nova)",
     "No entries — click below to add one.": "暂无条目 — 点击下方按钮添加。",
-    "Remove entry": "移除条目"
+    "Remove entry": "移除条目",
+    "Show only registered models": "仅显示已添加的模型",
+    "Per-image": "按张",
+    "Per-second": "按秒",
+    "Per-minute": "按分钟",
+    "Per-1M chars": "按 1M 字符",
+    "Image generation billing": "图像生成计费",
+    "Video generation billing": "视频生成计费",
+    "Speech recognition billing": "语音识别计费",
+    "Speech synthesis billing": "语音合成计费",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "详细定价（基础价 + 分辨率 / 质量 / 音色倍率）请在 Models → Metadata → Edit 抽屉里配置。此页面仅用于按 token 倍率的调节。",
+    "Base: $ / image": "基础价：$ / 张",
+    "Quality multipliers (hd, standard)": "质量倍率（hd / standard）",
+    "Size multipliers (1024x1024, 1024x1792)": "尺寸倍率（1024x1024 / 1024x1792）",
+    "Base: $ / second": "基础价：$ / 秒",
+    "Resolution multipliers (720p, 1080p, 4k)": "分辨率倍率（720p / 1080p / 4k）",
+    "Has-audio multiplier": "带音频倍率",
+    "Base: $ / minute": "基础价：$ / 分钟",
+    "Minimum billed minutes": "最小计费分钟数",
+    "Base: $ / 1M characters": "基础价：$ / 1M 字符",
+    "Voice multipliers (nova, echo, ...)": "音色倍率（nova / echo …）"
   }
 }

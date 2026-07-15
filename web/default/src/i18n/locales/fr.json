@@ -5316,6 +5316,26 @@
     "Multiplier per voice / clone type (e.g. \"clone\" = 2×). Missing entries default to 1.": "Multiplicateur par voix / type de clone (ex. \"clone\" = 2×). Manquant = 1.",
     "voice (e.g. nova)": "voix (ex. nova)",
     "No entries — click below to add one.": "Aucune entrée — cliquez ci-dessous pour en ajouter.",
-    "Remove entry": "Supprimer l'entrée"
+    "Remove entry": "Supprimer l'entrée",
+    "Show only registered models": "Afficher uniquement les modèles enregistrés",
+    "Per-image": "Par image",
+    "Per-second": "Par seconde",
+    "Per-minute": "Par minute",
+    "Per-1M chars": "Par 1M caractères",
+    "Image generation billing": "Facturation génération image",
+    "Video generation billing": "Facturation génération vidéo",
+    "Speech recognition billing": "Facturation reconnaissance vocale",
+    "Speech synthesis billing": "Facturation synthèse vocale",
+    "Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.": "Configurez le prix détaillé (prix de base + multiplicateurs résolution / qualité / voix) dans le tiroir Models → Metadata → Edit. Cette feuille est réservée à l’ajustement des ratios par token.",
+    "Base: $ / image": "Base: $ / image",
+    "Quality multipliers (hd, standard)": "Multiplicateurs qualité (hd, standard)",
+    "Size multipliers (1024x1024, 1024x1792)": "Multiplicateurs taille (1024x1024, 1024x1792)",
+    "Base: $ / second": "Base: $ / seconde",
+    "Resolution multipliers (720p, 1080p, 4k)": "Multiplicateurs résolution (720p, 1080p, 4k)",
+    "Has-audio multiplier": "Multiplicateur audio",
+    "Base: $ / minute": "Base: $ / minute",
+    "Minimum billed minutes": "Minutes facturées minimum",
+    "Base: $ / 1M characters": "Base: $ / 1M caractères",
+    "Voice multipliers (nova, echo, ...)": "Multiplicateurs voix (nova, echo, ...)"
   }
 }

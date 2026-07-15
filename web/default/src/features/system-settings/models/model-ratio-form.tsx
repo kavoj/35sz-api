@@ -16,8 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import { Code2, Eye, RotateCcw, Save } from 'lucide-react'
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { type UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -33,6 +34,8 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
+import { getModels } from '@/features/models/api'
+import { modelsQueryKeys } from '@/features/models/lib'
 
 import {
   SettingsForm,
@@ -169,6 +172,48 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   const [editMode, setEditMode] = useState<'visual' | 'json'>('visual')
   const visualEditorRef = useRef<ModelRatioVisualEditorHandle>(null)
 
+  // "Added only" toggle — default true so admins see just the models they've
+  // registered in the model catalogue. Toggling off reveals every OptionMap
+  // pricing key (including legacy models the admin removed from the catalogue
+  // but hasn't cleared from pricing). State persists in localStorage so the
+  // preference survives navigation.
+  const ADDED_ONLY_STORAGE_KEY = 'model-ratio-filter-added-only'
+  const [showAddedOnly, setShowAddedOnly] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(ADDED_ONLY_STORAGE_KEY)
+      return raw === null ? true : raw === 'true'
+    } catch {
+      return true
+    }
+  })
+  const handleToggleAddedOnly = useCallback((next: boolean) => {
+    setShowAddedOnly(next)
+    try {
+      localStorage.setItem(ADDED_ONLY_STORAGE_KEY, String(next))
+    } catch {
+      /* localStorage unavailable — ignore */
+    }
+  }, [])
+
+  // Fetch the registered models set for the filter. `page_size: 10000` is the
+  // convention used by other admin screens (e.g. model-mutate-drawer) to grab
+  // the full catalogue in one round-trip; the API caps at a large enough
+  // number that pagination isn't a concern for the 100-500 model range this
+  // deployment sees. `enabled: showAddedOnly` skips the request when the
+  // filter is off, so the toggle is truly zero-cost when disabled.
+  const { data: registeredModelsData } = useQuery({
+    queryKey: modelsQueryKeys.list({ pageSize: 10000, forFilter: true }),
+    queryFn: () => getModels({ page_size: 10000 }),
+    enabled: showAddedOnly,
+    staleTime: 60_000,
+  })
+  const registeredModelNames = useMemo(() => {
+    if (!registeredModelsData?.data?.items) return undefined
+    return new Set(
+      registeredModelsData.data.items.map((m) => m.model_name),
+    ) as ReadonlySet<string>
+  }, [registeredModelsData])
+
   const handleFieldChange = useCallback(
     (field: keyof ModelFormValues, value: string) => {
       form.setValue(field, value, {
@@ -194,7 +239,21 @@ export const ModelRatioForm = memo(function ModelRatioForm({
 
   return (
     <div className='space-y-6'>
-      <div className='flex flex-wrap justify-end gap-2'>
+      <div className='flex flex-wrap items-center justify-end gap-3'>
+        {/* Added-only filter toggle. Placed on the left of the toolbar so
+          * admins scanning left-to-right see the filter state before the
+          * destructive Reset action. Hidden in JSON edit mode because the
+          * JSON editor already shows the raw OptionMap and can't render a
+          * filtered view. */}
+        {editMode === 'visual' && (
+          <label className='mr-auto flex items-center gap-2 text-sm text-muted-foreground'>
+            <Switch
+              checked={showAddedOnly}
+              onCheckedChange={handleToggleAddedOnly}
+            />
+            <span>{t('Show only registered models')}</span>
+          </label>
+        )}
         <Button
           type='button'
           variant='destructive'
@@ -256,6 +315,8 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               audioCompletionRatio={form.watch('AudioCompletionRatio')}
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
+              filterAddedOnly={showAddedOnly}
+              registeredModelNames={registeredModelNames}
               onSave={handleSave}
               isSaving={isSaving}
               onChange={(field, value) => {

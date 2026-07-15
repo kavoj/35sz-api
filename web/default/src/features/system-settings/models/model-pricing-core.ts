@@ -39,7 +39,47 @@ export type ModelPricingFormValues = z.infer<
   ReturnType<typeof createModelPricingSchema>
 >
 
-export type PricingMode = 'per-token' | 'per-request' | 'tiered_expr'
+/**
+ * PricingMode enumerates every billing-shape the model-pricing sheet knows
+ * how to render. The three original token-oriented modes (`per-token`,
+ * `per-request`, `tiered_expr`) predate PR-7c and use the ratio-based fields
+ * on ModelPricingFormValues. The four structured modes added in PR-7c mirror
+ * the backend PricingKind enum (setting/ratio_setting/*_pricing.go) and let
+ * the admin edit native-unit prices — $/image, $/second, $/minute,
+ * $/1M-characters — instead of squeezing them through the token-ratio
+ * abstraction. See docs/api/models-pricing-endpoint.md §5 for the wire
+ * format the backend expects.
+ */
+export type PricingMode =
+  | 'per-token'
+  | 'per-request'
+  | 'tiered_expr'
+  | 'per-image'
+  | 'per-second'
+  | 'per-minute'
+  | 'per-1m-chars'
+
+/**
+ * pricingModeToBackendKind maps a UI-side PricingMode to the corresponding
+ * backend PricingKind constant. Consumed when the sheet POSTs a new
+ * structured pricing entry (see model-pricing-sheet.tsx). Returns `null`
+ * for the three legacy modes so the caller falls back to the ratio-based
+ * OptionMap update path.
+ */
+export function pricingModeToBackendKind(mode: PricingMode): string | null {
+  switch (mode) {
+    case 'per-image':
+      return 'image-gen'
+    case 'per-second':
+      return 'video-gen'
+    case 'per-minute':
+      return 'audio-in'
+    case 'per-1m-chars':
+      return 'audio-out'
+    default:
+      return null
+  }
+}
 
 export type LaneKey =
   | 'completion'
