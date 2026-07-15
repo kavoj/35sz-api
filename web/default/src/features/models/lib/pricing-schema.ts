@@ -282,3 +282,66 @@ export function pipelineTagToModelType(tag: HFPipelineTag): ModelTypeCode {
       return 'text'
   }
 }
+
+// -----------------------------------------------------------------------------
+// model_type → pricing_kind mapping
+// -----------------------------------------------------------------------------
+//
+// When the admin manually changes model_type in the drawer (or when the
+// system infers it from pipeline_tag on new-model create), the drawer's
+// pricing configuration should switch to the corresponding billing mode.
+// This function returns a *default* pricing_kind for each model_type; the
+// admin can still override via the KindSelector dropdown for edge cases
+// (e.g. an audio model that's actually TTS instead of ASR).
+//
+// Two model_types can map to multiple valid pricing_kinds:
+//
+//   - text → chat (default) or multimodal-chat (if the model accepts image/
+//     audio input tokens; admin must manually pick this variant)
+//   - audio → audio-in (default, ASR family) or audio-out (TTS family;
+//     admin must manually pick this variant)
+//
+// For image / video / embedding / file the mapping is unambiguous.
+
+export function modelTypeToPricingKind(modelType: ModelTypeCode): PricingKind {
+  switch (modelType) {
+    case 'image':
+      return 'image-gen'
+    case 'video':
+      return 'video-gen'
+    case 'audio':
+      // Most audio models this platform routes are ASR (whisper family).
+      // TTS admins can manually flip to audio-out via KindSelector.
+      return 'audio-in'
+    case 'embedding':
+      return 'embedding'
+    case 'text':
+    case 'file':
+    default:
+      return 'chat'
+  }
+}
+
+/**
+ * Compatible pricing_kinds for a given model_type. Used by the drawer to
+ * present only the kinds that make sense in the KindSelector dropdown after
+ * the admin has picked a model_type — no need to show `image-gen` when the
+ * type is `audio`, for example. Order matches admin expectation (most
+ * common variant first).
+ */
+export function pricingKindsForModelType(modelType: ModelTypeCode): PricingKind[] {
+  switch (modelType) {
+    case 'text':
+    case 'file':
+      // text has both mono-modal (chat) and multi-modal variants
+      return ['chat', 'multimodal-chat']
+    case 'image':
+      return ['image-gen']
+    case 'video':
+      return ['video-gen']
+    case 'audio':
+      return ['audio-in', 'audio-out']
+    case 'embedding':
+      return ['embedding']
+  }
+}

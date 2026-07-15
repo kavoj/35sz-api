@@ -284,24 +284,43 @@ export const CAPABILITY_ENDPOINT_HINTS: CapabilityEndpointHint[] = [
 // ============================================================================
 // Tag Presets
 // ============================================================================
+//
+// Split into two groups after PR-7a UX refactor:
+//
+//   - CAPABILITY_TAG_PRESET   — pipeline_tag-derived capability tags (chat,
+//     vision, image, video, etc.). Displayed as an INDEPENDENT chip row in
+//     the drawer because it's tightly coupled with the auto-inference logic
+//     (inferTagsFromModelName) and the tags directly drive UI icons + filter
+//     chips on the model list page.
+//
+//   - ADDITIONAL_TAG_PRESETS  — quality / use-case / content-type meta
+//     tags. Displayed as a SINGLE multi-select combobox in the drawer,
+//     because these are optional business-classification tags rarely
+//     auto-derived from the model name; combining them keeps the drawer
+//     compact while still giving admins full control.
+//
+// `TAG_PRESETS` (legacy export, all four groups) stays exported so any
+// unmigrated callers keep working; new code should reference the split
+// pair above.
 
-export const TAG_PRESETS = [
-  {
-    category: 'Model Capabilities',
-    tags: [
-      'chat',
-      'completion',
-      'vision',
-      'image',
-      'audio',
-      'video',
-      'embedding',
-      'code',
-      'reasoning',
-      'function-calling',
-      'tools',
-    ],
-  },
+export const CAPABILITY_TAG_PRESET = {
+  category: 'Model Capabilities',
+  tags: [
+    'chat',
+    'completion',
+    'vision',
+    'image',
+    'audio',
+    'video',
+    'embedding',
+    'code',
+    'reasoning',
+    'function-calling',
+    'tools',
+  ],
+} as const
+
+export const ADDITIONAL_TAG_PRESETS = [
   {
     category: 'Quality Levels',
     tags: [
@@ -330,6 +349,11 @@ export const TAG_PRESETS = [
     category: 'Content Types',
     tags: ['safe', 'nsfw', 'filtered', 'unfiltered'],
   },
+] as const
+
+export const TAG_PRESETS = [
+  CAPABILITY_TAG_PRESET,
+  ...ADDITIONAL_TAG_PRESETS,
 ] as const
 
 // Helper to get translated tag label

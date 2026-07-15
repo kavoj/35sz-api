@@ -33,6 +33,8 @@ import type {
   RatioType,
 } from '@/features/system-settings/types'
 
+import { normalizeModelName } from '../lib/model-name-normalize'
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -88,6 +90,50 @@ async function fetchOfficialPricing(): Promise<DifferencesMap> {
   })
   if (!res.success) return {}
   return res.data?.differences ?? {}
+}
+
+// -----------------------------------------------------------------------------
+// Fuzzy model-name resolution
+//
+// Upstream catalogues (basellm.github.io, models.dev) key their entries in
+// canonical marketing form — e.g. `Doubao-Seedream-5.0-pro`. The gateway,
+// however, persists and routes with the API-form identifier
+// `doubao-seedream-5-0-pro-260628`. A raw `diffs[modelName]` lookup misses.
+//
+// This helper picks the best catalogue key by lower-casing + swapping
+// `-N-M-` for `-N.M-` on BOTH sides and running a substring match. Whichever
+// key has the longest overlap wins (so `doubao-seed-1.6-vision` beats the
+// bare family key `doubao-seed-1.6`).
+//
+// The DifferencesMap's shape is `Record<modelName, per-ratio-diff>`; we
+// return the resolved key so the caller can use it verbatim in follow-up
+// `diffs[resolvedKey]` reads.
+// -----------------------------------------------------------------------------
+
+function resolveDiffsKey(
+  diffs: DifferencesMap,
+  modelName: string
+): string | null {
+  if (!modelName) return null
+  if (Object.prototype.hasOwnProperty.call(diffs, modelName)) return modelName
+  const target = normalizeModelName(modelName)
+  if (!target) return null
+
+  let bestKey: string | null = null
+  let bestOverlap = 0
+  for (const key of Object.keys(diffs)) {
+    const normKey = normalizeModelName(key)
+    if (!normKey) continue
+    const overlap =
+      target.includes(normKey) || normKey.includes(target)
+        ? Math.min(target.length, normKey.length)
+        : 0
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap
+      bestKey = key
+    }
+  }
+  return bestKey
 }
 
 // -----------------------------------------------------------------------------
@@ -170,9 +216,13 @@ export function useOfficialPricing(modelName: string | undefined | null): {
   if (!name) return { data: null, isLoading: false, isError: false }
 
   const diffs = query.data ?? {}
+  // Resolve API-form -> canonical form via fuzzy matching so
+  // `doubao-seedream-5-0-pro-260628` still finds `Doubao-Seedream-5.0-pro`.
+  const resolvedKey = resolveDiffsKey(diffs, name) ?? name
+
   const fromOfficial = snapshotForSource(
     diffs,
-    name,
+    resolvedKey,
     'official',
     OFFICIAL_CHANNEL_NAME
   )
@@ -185,7 +235,7 @@ export function useOfficialPricing(modelName: string | undefined | null): {
   }
   const fromModelsDev = snapshotForSource(
     diffs,
-    name,
+    resolvedKey,
     'models_dev',
     MODELS_DEV_PRESET_NAME
   )

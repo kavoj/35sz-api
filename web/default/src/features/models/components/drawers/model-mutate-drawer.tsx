@@ -100,6 +100,8 @@ import {
 import {
   getNameRuleOptions,
   ENDPOINT_TEMPLATES,
+  CAPABILITY_TAG_PRESET,
+  ADDITIONAL_TAG_PRESETS,
   TAG_PRESETS,
   getTagLabel,
   getTagCategoryLabel,
@@ -118,7 +120,18 @@ import {
   getGroupLabelKey,
   getPipelineTagLabelKey,
 } from '../../lib/hf-taxonomy'
-import { pipelineTagToModelType, normalizePricingKind, PIPELINE_TAG_TO_KIND, PRICING_KINDS, getKindLabelKey, getPriceUnitKey, type PricingKind } from '../../lib/pricing-schema'
+import {
+  pipelineTagToModelType,
+  modelTypeToPricingKind,
+  pricingKindsForModelType,
+  normalizePricingKind,
+  PIPELINE_TAG_TO_KIND,
+  PRICING_KINDS,
+  getKindLabelKey,
+  getPriceUnitKey,
+  type PricingKind,
+  type ModelTypeCode,
+} from '../../lib/pricing-schema'
 import {
   emptyAudioInPricing,
   emptyAudioOutPricing,
@@ -479,6 +492,43 @@ export function ModelMutateDrawer({
       lastAutoKindRef.current = inferredKind
     }
   }, [inferredDefaults.pipelineTag, inferredDefaults.source, open, form])
+
+  // Manual model_type → pricing_kind cascade.
+  //
+  // When the admin explicitly changes model_type (e.g. clicks the dropdown
+  // from Text to Image because the auto-inference guessed wrong), we want
+  // Pricing Configuration to switch to the corresponding billing shape
+  // immediately — otherwise the drawer would show token-based fields for a
+  // model the admin just declared to be an image generator.
+  //
+  // The cascade only fires when the new pricing_kind is NOT already
+  // compatible with the new model_type. That preserves the admin's
+  // choice when they picked a non-default kind (e.g. multimodal-chat for
+  // text, audio-out for audio).
+  const currentModelType = form.watch('model_type')
+  const lastCascadedModelTypeRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!open || !currentModelType) return
+    // Skip the very first render — the load / infer effects have priority.
+    if (lastCascadedModelTypeRef.current === undefined) {
+      lastCascadedModelTypeRef.current = currentModelType
+      return
+    }
+    if (lastCascadedModelTypeRef.current === currentModelType) return
+    lastCascadedModelTypeRef.current = currentModelType
+
+    const compatibleKinds = pricingKindsForModelType(
+      currentModelType as ModelTypeCode,
+    )
+    const currentKind = form.getValues('pricing_kind') as PricingKind
+    if (!compatibleKinds.includes(currentKind)) {
+      const defaultKind = modelTypeToPricingKind(
+        currentModelType as ModelTypeCode,
+      )
+      form.setValue('pricing_kind', defaultKind, { shouldDirty: true })
+      lastAutoKindRef.current = defaultKind
+    }
+  }, [currentModelType, open, form])
 
   // Sort vendors by usage and display name
   const sortedVendors = useMemo(() => {
@@ -1276,6 +1326,52 @@ export function ModelMutateDrawer({
                 )}
               />
 
+              {/* Model type — placed directly after Model Name so admins see
+                * the auto-inferred classification as soon as they type. Drives:
+                *   1. The /models/metadata list filter (Text/Image/Video/...)
+                *   2. The Pricing Configuration default kind (see the
+                *      model_type → pricing_kind auto-sync useEffect below)
+                *   3. Which capability tags the suggestion panel proposes
+                * Auto-inferred from pipeline_tag (via pipelineTagToModelType);
+                * admin can override if inference is wrong. */}
+              <FormField
+                control={form.control}
+                name='model_type'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Model type')}</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value='text'>{t('Text')}</SelectItem>
+                            <SelectItem value='image'>{t('Image')}</SelectItem>
+                            <SelectItem value='video'>{t('Video')}</SelectItem>
+                            <SelectItem value='audio'>{t('Audio')}</SelectItem>
+                            <SelectItem value='embedding'>
+                              {t('Embedding')}
+                            </SelectItem>
+                            <SelectItem value='file'>{t('File')}</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name='description'
@@ -1556,40 +1652,104 @@ export function ModelMutateDrawer({
                         placeholder={t('Add tags...')}
                       />
                     </FormControl>
-                    <div className='mt-2 space-y-2'>
-                      {TAG_PRESETS.map((category) => (
-                        <div key={category.category} className='space-y-1'>
-                          <p className='text-muted-foreground text-xs font-medium'>
-                            {getTagCategoryLabel(t, category.category)}
-                          </p>
-                          <div className='flex flex-wrap gap-1'>
-                            {category.tags.map((tag) => {
-                              const isSelected = field.value?.includes(tag)
-                              return (
-                                <button
-                                  key={tag}
-                                  type='button'
-                                  onClick={() => {
-                                    const currentTags = field.value || []
-                                    const newTags = isSelected
-                                      ? currentTags.filter((t) => t !== tag)
-                                      : [...currentTags, tag]
-                                    field.onChange(newTags)
-                                  }}
-                                  className={cn(
-                                    'rounded-full border px-2 py-0.5 text-xs transition-colors',
-                                    isSelected
-                                      ? 'border-primary bg-primary/10 text-primary'
-                                      : 'border-border text-muted-foreground hover:border-border hover:text-foreground'
-                                  )}
-                                >
-                                  {getTagLabel(t, tag)}
-                                </button>
-                              )
-                            })}
-                          </div>
+                    <div className='mt-2 space-y-3'>
+                      {/* Model Capabilities — independent chip row. These tags
+                        * are tightly coupled to pipeline_tag auto-inference and
+                        * drive UI icons + filter chips on the model list page.
+                        * Kept separate so admins can see the current "primary
+                        * shape" of the model at a glance. */}
+                      <div className='space-y-1'>
+                        <p className='text-muted-foreground text-xs font-medium'>
+                          {getTagCategoryLabel(t, CAPABILITY_TAG_PRESET.category)}
+                        </p>
+                        <div className='flex flex-wrap gap-1'>
+                          {CAPABILITY_TAG_PRESET.tags.map((tag) => {
+                            const isSelected = field.value?.includes(tag)
+                            return (
+                              <button
+                                key={tag}
+                                type='button'
+                                onClick={() => {
+                                  const currentTags = field.value || []
+                                  const newTags = isSelected
+                                    ? currentTags.filter((t) => t !== tag)
+                                    : [...currentTags, tag]
+                                  field.onChange(newTags)
+                                }}
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-xs transition-colors',
+                                  isSelected
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border text-muted-foreground hover:border-border hover:text-foreground',
+                                )}
+                              >
+                                {getTagLabel(t, tag)}
+                              </button>
+                            )
+                          })}
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Additional tags — quality / use-cases / content-types
+                        * merged into a single compact multi-select. Uses a
+                        * <details> disclosure to keep the drawer tight when
+                        * the admin doesn't need to touch these optional
+                        * business-classification tags. */}
+                      <details className='rounded-md border'>
+                        <summary className='cursor-pointer select-none px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/30'>
+                          {t('More tags (quality / use cases / content types)')}
+                          {(() => {
+                            const additionalSelected = (field.value || [])
+                              .filter((tag) =>
+                                ADDITIONAL_TAG_PRESETS.some((preset) =>
+                                  (preset.tags as readonly string[]).includes(
+                                    tag,
+                                  ),
+                                ),
+                              )
+                            return additionalSelected.length > 0 ? (
+                              <span className='ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary'>
+                                {additionalSelected.length}
+                              </span>
+                            ) : null
+                          })()}
+                        </summary>
+                        <div className='space-y-2 border-t px-3 py-2'>
+                          {ADDITIONAL_TAG_PRESETS.map((category) => (
+                            <div key={category.category} className='space-y-1'>
+                              <p className='text-muted-foreground text-[11px] font-medium'>
+                                {getTagCategoryLabel(t, category.category)}
+                              </p>
+                              <div className='flex flex-wrap gap-1'>
+                                {category.tags.map((tag) => {
+                                  const isSelected = field.value?.includes(tag)
+                                  return (
+                                    <button
+                                      key={tag}
+                                      type='button'
+                                      onClick={() => {
+                                        const currentTags = field.value || []
+                                        const newTags = isSelected
+                                          ? currentTags.filter((t) => t !== tag)
+                                          : [...currentTags, tag]
+                                        field.onChange(newTags)
+                                      }}
+                                      className={cn(
+                                        'rounded-full border px-2 py-0.5 text-xs transition-colors',
+                                        isSelected
+                                          ? 'border-primary bg-primary/10 text-primary'
+                                          : 'border-border text-muted-foreground hover:border-border hover:text-foreground',
+                                      )}
+                                    >
+                                      {getTagLabel(t, tag)}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     </div>
                     <FormDescription className='mt-2'>
                       {t(
@@ -1628,48 +1788,9 @@ export function ModelMutateDrawer({
                 )}
               />
 
-              {/* Model type — pre-filled from pipeline_tag inference (see
-                * the model_type auto-inference useEffect above). Admin can
-                * still override if the inference is wrong (a vision model
-                * that primarily produces text descriptions might legitimately
-                * be classified as `text` for filtering purposes). */}
-              <FormField
-                control={form.control}
-                name='model_type'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Model type')}</FormLabel>
-                    <FormControl>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value='text'>{t('Text')}</SelectItem>
-                            <SelectItem value='image'>{t('Image')}</SelectItem>
-                            <SelectItem value='video'>{t('Video')}</SelectItem>
-                            <SelectItem value='audio'>{t('Audio')}</SelectItem>
-                            <SelectItem value='embedding'>
-                              {t('Embedding')}
-                            </SelectItem>
-                            <SelectItem value='file'>{t('File')}</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Primary output modality — used by the model list filter. Auto-detected from the model name; override if the inference is wrong.'
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* model_type field moved to top of Basic Information block
+                * (right after model_name). See the FormField block near the
+                * beginning of this SideDrawerSection. */}
             </SideDrawerSection>
 
             <SideDrawerSection>
@@ -1710,130 +1831,6 @@ export function ModelMutateDrawer({
                     </FormControl>
                     <FormDescription>
                       {t('How this model name should match requests')}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </SideDrawerSection>
-
-            <SideDrawerSection>
-              <div className='flex items-center justify-between'>
-                <h3 className='text-sm font-semibold'>{t('Endpoints')}</h3>
-                <Select<string>
-                  items={[
-                    ...Object.entries(ENDPOINT_TEMPLATES).map(
-                      ([key, _template]) => ({
-                        value: key,
-                        label: key,
-                      })
-                    ),
-                  ]}
-                  onValueChange={(value) =>
-                    value !== null && handleFillEndpointTemplate(value)
-                  }
-                >
-                  <SelectTrigger size='sm' className='w-[200px]'>
-                    <SelectValue placeholder={t('Load template...')} />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {Object.entries(ENDPOINT_TEMPLATES).map(
-                        ([key, template]) => (
-                          <SelectItem key={key} value={key}>
-                            <div className='flex flex-col'>
-                              <span>{key}</span>
-                              {template.description && (
-                                <span className='text-muted-foreground text-xs'>
-                                  {template.description}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <FormField
-                control={form.control}
-                name='endpoints'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Endpoint Configuration')}</FormLabel>
-                    <FormControl>
-                      <JsonEditor
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        keyPlaceholder='endpoint_type (e.g., chat, completions)'
-                        valuePlaceholder='{"path": "/v1/...", "method": "POST"}'
-                        keyLabel='Endpoint Type'
-                        valueLabel='Configuration'
-                        valueType='any'
-                        emptyMessage={t(
-                          'No endpoints configured. Switch to JSON mode or add rows to define endpoints.'
-                        )}
-                      />
-                    </FormControl>
-                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
-                      <p className='text-muted-foreground text-xs font-medium'>
-                        {t('Configuration Format')}
-                      </p>
-                      <pre className='text-muted-foreground overflow-x-auto text-xs'>
-                        {`{
-  "chat": {
-    "path": "/v1/chat/completions",
-    "method": "POST"
-  },
-  "completions": {
-    "path": "/v1/completions",
-    "method": "POST"
-  }
-}`}
-                      </pre>
-                    </div>
-                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
-                      <p className='text-muted-foreground text-xs font-medium'>
-                        {t('Capability → Endpoint reference')}
-                      </p>
-                      <div className='flex flex-col gap-1.5'>
-                        {CAPABILITY_ENDPOINT_HINTS.map((hint) => (
-                          <div
-                            key={hint.capability}
-                            className='flex items-center justify-between gap-2'
-                          >
-                            <div className='flex flex-col'>
-                              <span className='text-foreground text-xs font-medium'>
-                                {getTagLabel(t, hint.capability)}
-                              </span>
-                              <span className='text-muted-foreground text-[11px]'>
-                                {t(hint.descriptionKey)}
-                              </span>
-                            </div>
-                            <div className='flex flex-wrap gap-1'>
-                              {hint.templateKeys.map((key) => (
-                                <button
-                                  key={key}
-                                  type='button'
-                                  onClick={() =>
-                                    handleFillEndpointTemplate(key)
-                                  }
-                                  className='border-border text-muted-foreground hover:border-primary hover:text-primary rounded-full border px-2 py-0.5 text-[11px] transition-colors'
-                                >
-                                  {key}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <FormDescription>
-                      {t(
-                        'Define API endpoints for this model. Each endpoint type maps to a path and HTTP method.'
-                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -2372,6 +2369,135 @@ export function ModelMutateDrawer({
               )}
                 </>
               )}
+            </SideDrawerSection>
+
+            {/* Endpoints — moved BELOW Pricing Configuration per PR-7a UX
+              * refactor. Logical order in the drawer now flows: identify the
+              * model (Basic Info) → classify it (Tags) → set its pricing
+              * (Pricing) → wire its API routing (Endpoints). Endpoint config
+              * is orthogonal to billing shape, so it lands last. */}
+            <SideDrawerSection>
+              <div className='flex items-center justify-between'>
+                <h3 className='text-sm font-semibold'>{t('Endpoints')}</h3>
+                <Select<string>
+                  items={[
+                    ...Object.entries(ENDPOINT_TEMPLATES).map(
+                      ([key, _template]) => ({
+                        value: key,
+                        label: key,
+                      })
+                    ),
+                  ]}
+                  onValueChange={(value) =>
+                    value !== null && handleFillEndpointTemplate(value)
+                  }
+                >
+                  <SelectTrigger size='sm' className='w-[200px]'>
+                    <SelectValue placeholder={t('Load template...')} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {Object.entries(ENDPOINT_TEMPLATES).map(
+                        ([key, template]) => (
+                          <SelectItem key={key} value={key}>
+                            <div className='flex flex-col'>
+                              <span>{key}</span>
+                              {template.description && (
+                                <span className='text-muted-foreground text-xs'>
+                                  {template.description}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <FormField
+                control={form.control}
+                name='endpoints'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Endpoint Configuration')}</FormLabel>
+                    <FormControl>
+                      <JsonEditor
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        keyPlaceholder='endpoint_type (e.g., chat, completions)'
+                        valuePlaceholder='{"path": "/v1/...", "method": "POST"}'
+                        keyLabel='Endpoint Type'
+                        valueLabel='Configuration'
+                        valueType='any'
+                        emptyMessage={t(
+                          'No endpoints configured. Switch to JSON mode or add rows to define endpoints.'
+                        )}
+                      />
+                    </FormControl>
+                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
+                      <p className='text-muted-foreground text-xs font-medium'>
+                        {t('Configuration Format')}
+                      </p>
+                      <pre className='text-muted-foreground overflow-x-auto text-xs'>
+                        {`{
+  "chat": {
+    "path": "/v1/chat/completions",
+    "method": "POST"
+  },
+  "completions": {
+    "path": "/v1/completions",
+    "method": "POST"
+  }
+}`}
+                      </pre>
+                    </div>
+                    <div className='border-border bg-card/50 mt-2 space-y-2 rounded-lg border p-3'>
+                      <p className='text-muted-foreground text-xs font-medium'>
+                        {t('Capability → Endpoint reference')}
+                      </p>
+                      <div className='flex flex-col gap-1.5'>
+                        {CAPABILITY_ENDPOINT_HINTS.map((hint) => (
+                          <div
+                            key={hint.capability}
+                            className='flex items-center justify-between gap-2'
+                          >
+                            <div className='flex flex-col'>
+                              <span className='text-foreground text-xs font-medium'>
+                                {getTagLabel(t, hint.capability)}
+                              </span>
+                              <span className='text-muted-foreground text-[11px]'>
+                                {t(hint.descriptionKey)}
+                              </span>
+                            </div>
+                            <div className='flex flex-wrap gap-1'>
+                              {hint.templateKeys.map((key) => (
+                                <button
+                                  key={key}
+                                  type='button'
+                                  onClick={() =>
+                                    handleFillEndpointTemplate(key)
+                                  }
+                                  className='border-border text-muted-foreground hover:border-primary hover:text-primary rounded-full border px-2 py-0.5 text-[11px] transition-colors'
+                                >
+                                  {key}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <FormDescription>
+                      {t(
+                        'Define API endpoints for this model. Each endpoint type maps to a path and HTTP method.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </SideDrawerSection>
 
             <SideDrawerSection>
