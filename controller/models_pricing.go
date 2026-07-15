@@ -19,8 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 package controller
 
 import (
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/constant/vendor_official_pricing"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -84,6 +87,22 @@ type ModelPricingEntry struct {
 	PricingKind string  `json:"pricing_kind"`
 	PricingType string  `json:"pricing_type"`
 	Pricing     Pricing `json:"pricing"`
+	// PricingSource tells the caller how confident to be in the numbers.
+	// Introduced by PR-7d so downstream Agent platforms can distinguish
+	// admin-curated prices from compiled-in reference data.
+	//
+	//   "user_configured" — admin set an explicit price via
+	//     /models/metadata edit drawer or the model-pricing sheet. Highest
+	//     confidence; use verbatim.
+	//   "vendor_official" — reserved for the PR-7e vendor sync page which
+	//     writes runtime overrides into OptionMap["VendorOfficialPricing"].
+	//   "static_baseline" — this response came from the compiled-in
+	//     constant/vendor_official_pricing catalog. Refresh sources
+	//     periodically; may lag actual vendor console prices.
+	//   "none"            — no data available; the entry carries
+	//     pricing_incomplete=true and downstream should fall back to its
+	//     own local pricing.
+	PricingSource string `json:"pricing_source"`
 }
 
 // Pricing is a discriminated union — the fields relevant to the entry's
@@ -207,11 +226,26 @@ func GetModelsPricing(c *gin.Context) {
 	// pricing.go's metaMap has the same policy.
 	metaKindMap := make(map[string]string)
 	metaTypeMap := make(map[string]string)
+	metaVendorMap := make(map[string]int)
 	models, err := model.GetAllModels(0, 100000)
 	if err == nil {
 		for _, m := range models {
 			metaKindMap[m.ModelName] = constant.NormalizePricingKind(m.PricingKind)
 			metaTypeMap[m.ModelName] = m.ModelType
+			metaVendorMap[m.ModelName] = m.VendorID
+		}
+	}
+
+	// Build a vendor_id → normalized-slug map so the fallback lookup can
+	// query the right catalog. The slug is derived from Vendor.Name /
+	// DisplayName (lower-cased); constant/vendor_official_pricing.Registry
+	// keys off of the same normalization. When a vendor is missing (dead
+	// FK, race with vendor deletion) we skip the hint and let Lookup
+	// scan every catalog.
+	vendorSlugByID := make(map[int]string)
+	if vendors := model.GetVendors(); len(vendors) > 0 {
+		for _, v := range vendors {
+			vendorSlugByID[v.ID] = strings.ToLower(v.Name)
 		}
 	}
 
@@ -226,11 +260,18 @@ func GetModelsPricing(c *gin.Context) {
 			modelType = modelTypeForKind(kind)
 		}
 
+		vendorSlug := vendorSlugByID[metaVendorMap[p.ModelName]]
+		body, source := buildPricingBody(
+			p, kind, vendorSlug,
+			imageMap, videoMap, audioInMap, audioOutMap,
+		)
+
 		entry := ModelPricingEntry{
-			ModelType:   modelType,
-			PricingKind: kind,
-			PricingType: pricingTypeForKind(kind),
-			Pricing:     buildPricingBody(p, kind, imageMap, videoMap, audioInMap, audioOutMap),
+			ModelType:     modelType,
+			PricingKind:   kind,
+			PricingType:   pricingTypeForKind(kind),
+			Pricing:       body,
+			PricingSource: source,
 		}
 		data[p.ModelName] = entry
 	}
@@ -253,83 +294,201 @@ func firstPricingVersion(pricings []model.Pricing) string {
 	return pricings[0].PricingVersion
 }
 
-// buildPricingBody populates the fields relevant to `kind`. Fields
-// irrelevant to the kind stay at their Go zero value, which JSON
-// serialization omits (thanks to the omitempty tags on Pricing).
+// buildPricingBody populates the fields relevant to `kind`, falling back
+// through three layers when the primary source is empty. Returns the body
+// AND the pricing_source label so the handler can stamp the entry.
+//
+// Layer order:
+//   1. user_configured — admin explicitly set values via /models/metadata
+//      drawer or the model-pricing sheet. These flow into the ModelRatio /
+//      ImagePricing / VideoPricing / ... OptionMap tables that pass through
+//      as function arguments here.
+//   2. vendor_official — reserved for the PR-7e runtime override page (not
+//      wired yet). When implemented, it will consult
+//      OptionMap["VendorOfficialPricing"] before the static baseline below.
+//   3. static_baseline — compiled-in vendor catalogs under
+//      constant/vendor_official_pricing. Used when the admin hasn't
+//      configured anything and the vendor sync page hasn't overridden either.
+//
+// A "user_configured" chat-kind entry always short-circuits to that source
+// because chat models always have SOMETHING in ModelRatio even for legacy
+// rows. For structured kinds (image / video / audio) we let empty configured
+// values fall through to the static baseline so downstream still sees a
+// meaningful price.
 func buildPricingBody(
 	p model.Pricing,
 	kind string,
+	vendorSlug string,
 	imageMap map[string]ratio_setting.ImagePricing,
 	videoMap map[string]ratio_setting.VideoPricing,
 	audioInMap map[string]ratio_setting.AudioInPricing,
 	audioOutMap map[string]ratio_setting.AudioOutPricing,
-) Pricing {
+) (Pricing, string) {
 	body := Pricing{
 		// Legacy flat ModelPrice — carried on every entry so a downstream
 		// can honor per-request pricing regardless of kind. Zero means
 		// "no flat override, use kind-specific fields".
 		FlatPricePerRequest: p.ModelPrice,
 	}
+	source := "none"
 
-	// Effective USD/1M ratios — always populated for chat-shaped kinds;
-	// for image/video/audio-gen kinds they'd be misleading (the model
-	// isn't billed per token), so we leave them zero.
 	switch kind {
 	case constant.PricingKindChat,
 		constant.PricingKindMultimodalChat,
 		constant.PricingKindEmbedding:
-		body.ModelRatio = p.ModelRatio
-		body.CompletionRatio = p.CompletionRatio
-		body.CacheRatio = p.CacheRatio
-		body.ImageRatio = p.ImageRatio
-		body.AudioRatio = p.AudioRatio
-		body.AudioCompletionRatio = p.AudioCompletionRatio
-		// 1 ModelRatio unit = $2 / 1M tokens. Convention baked into
-		// setting/ratio_setting/model_ratio.go. Denormalized here so
-		// downstream doesn't need to know the "× 2" magic constant.
-		body.InputPerMillionTokens = p.ModelRatio * 2
-		if p.CompletionRatio > 0 {
-			body.OutputPerMillionTokens = p.ModelRatio * 2 * p.CompletionRatio
-		} else {
-			body.OutputPerMillionTokens = p.ModelRatio * 2
+		// Token-based kinds — admin-configured ratios take precedence.
+		// A model_ratio of 0 with no flat price means the admin hasn't
+		// touched it yet, in which case we still try the vendor baseline.
+		configured := p.ModelRatio > 0 || p.CompletionRatio > 0 ||
+			body.FlatPricePerRequest > 0
+		if configured {
+			body.ModelRatio = p.ModelRatio
+			body.CompletionRatio = p.CompletionRatio
+			body.CacheRatio = p.CacheRatio
+			body.ImageRatio = p.ImageRatio
+			body.AudioRatio = p.AudioRatio
+			body.AudioCompletionRatio = p.AudioCompletionRatio
+			// 1 ModelRatio unit = $2 / 1M tokens. Convention baked into
+			// setting/ratio_setting/model_ratio.go.
+			body.InputPerMillionTokens = p.ModelRatio * 2
+			if p.CompletionRatio > 0 {
+				body.OutputPerMillionTokens = p.ModelRatio * 2 * p.CompletionRatio
+			} else {
+				body.OutputPerMillionTokens = p.ModelRatio * 2
+			}
+			source = "user_configured"
+			break
 		}
+		if fill := lookupVendorBaselineForChat(p.ModelName, vendorSlug); fill != nil {
+			body.InputPerMillionTokens = fill.InputPerMillionTokens
+			body.OutputPerMillionTokens = fill.OutputPerMillionTokens
+			// Reverse-derive model_ratio so downstream that still consults
+			// the ratio fields sees a consistent view.
+			body.ModelRatio = fill.InputPerMillionTokens / 2
+			if fill.InputPerMillionTokens > 0 {
+				body.CompletionRatio = fill.OutputPerMillionTokens /
+					fill.InputPerMillionTokens
+			}
+			source = "static_baseline"
+			break
+		}
+		body.PricingIncomplete = true
 
 	case constant.PricingKindImageGen:
 		if ip, ok := imageMap[p.ModelName]; ok && ip.PricePerImage > 0 {
 			body.PricePerImage = ip.PricePerImage
 			body.QualityMultipliers = ip.QualityMultipliers
 			body.SizeMultipliers = ip.SizeMultipliers
-		} else if body.FlatPricePerRequest <= 0 {
-			body.PricingIncomplete = true
+			source = "user_configured"
+			break
 		}
+		if body.FlatPricePerRequest > 0 {
+			source = "user_configured"
+			break
+		}
+		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+			fill.Kind == "image-gen" && fill.PricePerImage > 0 {
+			body.PricePerImage = fill.PricePerImage
+			body.QualityMultipliers = fill.QualityMultipliers
+			body.SizeMultipliers = fill.SizeMultipliers
+			source = "static_baseline"
+			break
+		}
+		body.PricingIncomplete = true
 
 	case constant.PricingKindVideoGen:
 		if vp, ok := videoMap[p.ModelName]; ok && vp.PricePerSecond > 0 {
 			body.PricePerSecond = vp.PricePerSecond
 			body.ResolutionMultipliers = vp.ResolutionMultipliers
 			body.HasAudioMultiplier = vp.HasAudioMultiplier
-		} else if body.FlatPricePerRequest <= 0 {
-			body.PricingIncomplete = true
+			source = "user_configured"
+			break
 		}
+		if body.FlatPricePerRequest > 0 {
+			source = "user_configured"
+			break
+		}
+		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+			fill.Kind == "video-gen" && fill.PricePerSecond > 0 {
+			body.PricePerSecond = fill.PricePerSecond
+			body.ResolutionMultipliers = fill.ResolutionMultipliers
+			body.HasAudioMultiplier = fill.HasAudioMultiplier
+			source = "static_baseline"
+			break
+		}
+		body.PricingIncomplete = true
 
 	case constant.PricingKindAudioIn:
 		if ap, ok := audioInMap[p.ModelName]; ok && ap.PricePerMinute > 0 {
 			body.PricePerMinute = ap.PricePerMinute
 			body.MinBillMinutes = ap.MinBillMinutes
-		} else if body.FlatPricePerRequest <= 0 {
-			body.PricingIncomplete = true
+			source = "user_configured"
+			break
 		}
+		if body.FlatPricePerRequest > 0 {
+			source = "user_configured"
+			break
+		}
+		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+			fill.Kind == "audio-in" && fill.PricePerMinute > 0 {
+			body.PricePerMinute = fill.PricePerMinute
+			body.MinBillMinutes = fill.MinBillMinutes
+			source = "static_baseline"
+			break
+		}
+		body.PricingIncomplete = true
 
 	case constant.PricingKindAudioOut:
 		if ap, ok := audioOutMap[p.ModelName]; ok && ap.PricePerMillionChars > 0 {
 			body.PricePerMillionChars = ap.PricePerMillionChars
 			body.VoiceMultipliers = ap.VoiceMultipliers
-		} else if body.FlatPricePerRequest <= 0 {
-			body.PricingIncomplete = true
+			source = "user_configured"
+			break
 		}
+		if body.FlatPricePerRequest > 0 {
+			source = "user_configured"
+			break
+		}
+		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+			fill.Kind == "audio-out" && fill.PricePerMillionChars > 0 {
+			body.PricePerMillionChars = fill.PricePerMillionChars
+			body.VoiceMultipliers = fill.VoiceMultipliers
+			source = "static_baseline"
+			break
+		}
+		body.PricingIncomplete = true
 	}
 
-	return body
+	return body, source
+}
+
+// lookupVendorBaselineForChat is a specialization of the generic Lookup
+// that only returns chat / multimodal-chat / embedding entries. The
+// three token-based kinds share the same static-baseline shape (a pair
+// of $ / 1M tokens), so we return a lightweight anonymous struct instead
+// of the full VendorPricingEntry.
+func lookupVendorBaselineForChat(modelName, vendorSlug string) *struct {
+	InputPerMillionTokens  float64
+	OutputPerMillionTokens float64
+} {
+	entry, ok := vendor_official_pricing.Lookup(modelName, vendorSlug)
+	if !ok {
+		return nil
+	}
+	switch entry.Kind {
+	case "chat", "multimodal-chat", "embedding":
+		if entry.InputPerMillionTokens <= 0 && entry.OutputPerMillionTokens <= 0 {
+			return nil
+		}
+		return &struct {
+			InputPerMillionTokens  float64
+			OutputPerMillionTokens float64
+		}{
+			InputPerMillionTokens:  entry.InputPerMillionTokens,
+			OutputPerMillionTokens: entry.OutputPerMillionTokens,
+		}
+	}
+	return nil
 }
 
 // Reserved for future: rate-limit and record downstream polling for
