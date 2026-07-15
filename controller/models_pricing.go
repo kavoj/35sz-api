@@ -128,6 +128,22 @@ type Pricing struct {
 	// price, regardless of its pricing_kind. Downstream should honor
 	// this over the finer-grained fields when both are populated.
 	FlatPricePerRequest float64 `json:"flat_price_per_request,omitempty"`
+
+	// --- data-quality flag ---
+	// PricingIncomplete = true means the model has pricing_kind set to a
+	// structured kind (image-gen / video-gen / audio-in / audio-out) but
+	// the corresponding *Pricing option row is empty or missing. This can
+	// happen when:
+	//   - The admin classified the model as video-gen in the metadata UI
+	//     but hasn't opened the pricing drawer to enter numbers yet.
+	//   - A seed data set covers only a subset of the model catalogue.
+	//   - Legacy rows migrated from ModelPrice but never got a structured
+	//     entry.
+	// Downstream integrators MUST fall back to their local pricing table
+	// (or refuse to bill) when this flag is true — the flat / ratio
+	// fields cannot be trusted to represent the model's real billing
+	// shape in that state.
+	PricingIncomplete bool `json:"pricing_incomplete,omitempty"`
 }
 
 // pricingTypeForKind maps a PricingKind to a stable "pricing_type" string
@@ -279,29 +295,37 @@ func buildPricingBody(
 		}
 
 	case constant.PricingKindImageGen:
-		if ip, ok := imageMap[p.ModelName]; ok {
+		if ip, ok := imageMap[p.ModelName]; ok && ip.PricePerImage > 0 {
 			body.PricePerImage = ip.PricePerImage
 			body.QualityMultipliers = ip.QualityMultipliers
 			body.SizeMultipliers = ip.SizeMultipliers
+		} else if body.FlatPricePerRequest <= 0 {
+			body.PricingIncomplete = true
 		}
 
 	case constant.PricingKindVideoGen:
-		if vp, ok := videoMap[p.ModelName]; ok {
+		if vp, ok := videoMap[p.ModelName]; ok && vp.PricePerSecond > 0 {
 			body.PricePerSecond = vp.PricePerSecond
 			body.ResolutionMultipliers = vp.ResolutionMultipliers
 			body.HasAudioMultiplier = vp.HasAudioMultiplier
+		} else if body.FlatPricePerRequest <= 0 {
+			body.PricingIncomplete = true
 		}
 
 	case constant.PricingKindAudioIn:
-		if ap, ok := audioInMap[p.ModelName]; ok {
+		if ap, ok := audioInMap[p.ModelName]; ok && ap.PricePerMinute > 0 {
 			body.PricePerMinute = ap.PricePerMinute
 			body.MinBillMinutes = ap.MinBillMinutes
+		} else if body.FlatPricePerRequest <= 0 {
+			body.PricingIncomplete = true
 		}
 
 	case constant.PricingKindAudioOut:
-		if ap, ok := audioOutMap[p.ModelName]; ok {
+		if ap, ok := audioOutMap[p.ModelName]; ok && ap.PricePerMillionChars > 0 {
 			body.PricePerMillionChars = ap.PricePerMillionChars
 			body.VoiceMultipliers = ap.VoiceMultipliers
+		} else if body.FlatPricePerRequest <= 0 {
+			body.PricingIncomplete = true
 		}
 	}
 
