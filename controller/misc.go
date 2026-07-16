@@ -135,6 +135,19 @@ func GetStatus(c *gin.Context) {
 		data["faq"] = console_setting.GetFAQ()
 	}
 
+	// 统计数据：模型数、渠道数、调度分组数
+	var modelCount int64
+	model.DB.Model(&model.Model{}).Count(&modelCount)
+	data["model_count"] = modelCount
+
+	var channelCount int64
+	model.DB.Model(&model.Channel{}).Count(&channelCount)
+	data["channel_count"] = channelCount
+
+	var groupCount int64
+	model.DB.Model(&model.Channel{}).Select("COUNT(DISTINCT " + model.GroupCol() + ")").Scan(&groupCount)
+	data["strategy_count"] = groupCount
+
 	// Add enabled custom OAuth providers
 	customProviders := oauth.GetEnabledCustomProviders()
 	if len(customProviders) > 0 {

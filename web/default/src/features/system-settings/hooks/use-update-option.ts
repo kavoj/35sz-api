@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 
 import { updateSystemOption } from '../api'
 import type { UpdateOptionRequest } from '../types'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 // Configuration keys that require status refresh
 const STATUS_RELATED_KEYS = [
@@ -37,6 +38,7 @@ const STATUS_RELATED_KEYS = [
   'general_setting.quota_display_type',
   'general_setting.custom_currency_symbol',
   'general_setting.custom_currency_exchange_rate',
+  'Footer',
 ]
 
 export function useUpdateOption() {
@@ -48,6 +50,14 @@ export function useUpdateOption() {
       if (data.success) {
         // Always refresh system-options
         queryClient.invalidateQueries({ queryKey: ['system-options'] })
+
+        // When Footer is updated, sync to the system config store immediately
+        // so the home page footer reflects the change without a page refresh.
+        if (variables.key === 'Footer') {
+          useSystemConfigStore.getState().setConfig({
+            footerHtml: variables.value,
+          })
+        }
 
         // If updating frontend-display-related config, also refresh status
         if (STATUS_RELATED_KEYS.includes(variables.key)) {

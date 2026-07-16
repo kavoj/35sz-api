@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useStatus } from '@/hooks/use-status'
+
 interface CounterProps {
   end: number
   suffix?: string
@@ -92,16 +94,26 @@ interface StatItem {
   suffix: string
   label: string
   decimals?: number
+  prefix?: string
 }
 
 export function Stats(_props: StatsProps) {
   const { t } = useTranslation()
+  const { status } = useStatus()
+
+  const statusData = (status as Record<string, unknown>)?.data as
+    | Record<string, unknown>
+    | undefined
+
+  const modelCount = (statusData?.model_count as number) || 100
+  const channelCount = (statusData?.channel_count as number) || 40
+  const strategyCount = (statusData?.strategy_count as number) || 10
 
   const stats: StatItem[] = [
-    { end: 50, suffix: '+', label: t('upstream services integrated') },
-    { end: 100, suffix: '+', label: t('model billing support') },
-    { end: 50, suffix: '+', label: t('compatible API routes') },
-    { end: 10, suffix: '+', label: t('scheduling controls') },
+    { end: modelCount, suffix: '+', label: t('models supported') },
+    { end: channelCount, suffix: '+', label: t('provider integrations') },
+    { end: 100, suffix: '%', label: t('brand customizable') },
+    { end: strategyCount, suffix: '+', label: t('scheduling strategies') },
   ]
 
   return (
@@ -113,10 +125,10 @@ export function Stats(_props: StatsProps) {
               key={s.label}
               className='flex flex-col items-center text-center'
             >
-              <span className='text-2xl font-bold tracking-tight md:text-3xl'>
-                <Counter end={s.end} suffix={s.suffix} decimals={s.decimals} />
+              <span className='text-3xl font-bold tracking-tight md:text-4xl'>
+                <Counter end={s.end} suffix={s.suffix} prefix={s.prefix} decimals={s.decimals} />
               </span>
-              <span className='text-muted-foreground mt-1.5 text-xs'>
+              <span className='text-muted-foreground mt-1.5 text-sm'>
                 {s.label}
               </span>
             </div>
