@@ -81,6 +81,31 @@ import {
   usdToDisplayPricingValue,
 } from './pricing-format'
 import { TieredPricingEditor } from './tiered-pricing-editor'
+import {
+  convertBillingDisplayToUSD,
+  convertUSDToBillingDisplay,
+  getCurrencyDisplay,
+} from '@/lib/currency'
+import { safeJsonParse } from '../utils/json-parser'
+import { normalizeJsonString } from './utils'
+import {
+  ImageGenEditor,
+  VideoGenEditor,
+  AudioInEditor,
+  AudioOutEditor,
+} from '@/features/models/components/pricing/structured-pricing-editor'
+import {
+  emptyImagePricing,
+  emptyVideoPricing,
+  emptyAudioInPricing,
+  emptyAudioOutPricing,
+} from '@/features/models/lib/pricing-types'
+import type {
+  ImagePricing,
+  VideoPricing,
+  AudioInPricing,
+  AudioOutPricing,
+} from '@/features/models/lib/pricing-types'
 
 const createModelPricingSchema = (t: (key: string) => string) =>
   z.object({
@@ -93,6 +118,10 @@ const createModelPricingSchema = (t: (key: string) => string) =>
     imageRatio: z.string().optional(),
     audioRatio: z.string().optional(),
     audioCompletionRatio: z.string().optional(),
+    imagePricing: z.string().optional(),
+    videoPricing: z.string().optional(),
+    audioInPricing: z.string().optional(),
+    audioOutPricing: z.string().optional(),
   })
 
 type ModelPricingFormValues = z.infer<
@@ -125,6 +154,10 @@ export type ModelRatioData = {
   imageRatio?: string
   audioRatio?: string
   audioCompletionRatio?: string
+  imagePricing?: string
+  videoPricing?: string
+  audioInPricing?: string
+  audioOutPricing?: string
   billingMode?: PricingMode
   billingExpr?: string
   requestRuleExpr?: string
@@ -456,7 +489,27 @@ export function ModelPricingEditorPanel({
   const [billingExpr, setBillingExpr] = useState('')
   const [requestRuleExpr, setRequestRuleExpr] = useState('')
   const [previewOpen, setPreviewOpen] = useState(true)
+  const [imagePricing, setImagePricing] = useState<ImagePricing>(() =>
+    emptyImagePricing()
+  )
+  const [videoPricing, setVideoPricing] = useState<VideoPricing>(() =>
+    emptyVideoPricing()
+  )
+  const [audioInPricing, setAudioInPricing] = useState<AudioInPricing>(() =>
+    emptyAudioInPricing()
+  )
+  const [audioOutPricing, setAudioOutPricing] = useState<AudioOutPricing>(
+    () => emptyAudioOutPricing()
+  )
   const isEditMode = !!editData
+
+  const { config: currencyConfig } = getCurrencyDisplay()
+  const pricingCurrencyLabel =
+    currencyConfig.quotaDisplayType === 'CNY'
+      ? '元'
+      : currencyConfig.quotaDisplayType === 'CUSTOM'
+        ? '自定义'
+        : 'USD'
 
   const form = useForm<ModelPricingFormValues>({
     resolver: zodResolver(createModelPricingSchema(t)),
@@ -470,6 +523,10 @@ export function ModelPricingEditorPanel({
       imageRatio: '',
       audioRatio: '',
       audioCompletionRatio: '',
+      imagePricing: '',
+      videoPricing: '',
+      audioInPricing: '',
+      audioOutPricing: '',
     },
   })
 
@@ -487,16 +544,89 @@ export function ModelPricingEditorPanel({
         imageRatio: editData.imageRatio || '',
         audioRatio: editData.audioRatio || '',
         audioCompletionRatio: editData.audioCompletionRatio || '',
+        imagePricing: editData.imagePricing || '',
+        videoPricing: editData.videoPricing || '',
+        audioInPricing: editData.audioInPricing || '',
+        audioOutPricing: editData.audioOutPricing || '',
       })
+      const billingMode = editData.billingMode
+      const isStructured =
+        billingMode === 'per-image' ||
+        billingMode === 'per-second' ||
+        billingMode === 'per-minute' ||
+        billingMode === 'per-1m-chars'
       setPricingMode(
-        editData.billingMode === 'tiered_expr'
-          ? 'tiered_expr'
-          : editData.price
-            ? 'per-request'
-            : 'per-token'
+        isStructured
+          ? (billingMode as PricingMode)
+          : billingMode === 'tiered_expr'
+            ? 'tiered_expr'
+            : editData.price
+              ? 'per-request'
+              : 'per-token'
       )
       setBillingExpr(editData.billingExpr || '')
       setRequestRuleExpr(editData.requestRuleExpr || '')
+
+      // Initialize structured pricing from editData
+      const modelName = editData.name
+      const imageMap = safeJsonParse<Record<string, ImagePricing>>(
+        editData.imagePricing || '{}',
+        { fallback: {}, silent: true }
+      )
+      const rawImg = imageMap[modelName]
+      setImagePricing(
+        rawImg
+          ? {
+              ...rawImg,
+              price_per_image:
+                convertUSDToBillingDisplay(rawImg.price_per_image),
+            }
+          : emptyImagePricing()
+      )
+      const videoMap = safeJsonParse<Record<string, VideoPricing>>(
+        editData.videoPricing || '{}',
+        { fallback: {}, silent: true }
+      )
+      const rawVid = videoMap[modelName]
+      setVideoPricing(
+        rawVid
+          ? {
+              ...rawVid,
+              price_per_second:
+                convertUSDToBillingDisplay(rawVid.price_per_second),
+            }
+          : emptyVideoPricing()
+      )
+      const audioInMap = safeJsonParse<Record<string, AudioInPricing>>(
+        editData.audioInPricing || '{}',
+        { fallback: {}, silent: true }
+      )
+      const rawAin = audioInMap[modelName]
+      setAudioInPricing(
+        rawAin
+          ? {
+              ...rawAin,
+              price_per_minute:
+                convertUSDToBillingDisplay(rawAin.price_per_minute),
+            }
+          : emptyAudioInPricing()
+      )
+      const audioOutMap = safeJsonParse<Record<string, AudioOutPricing>>(
+        editData.audioOutPricing || '{}',
+        { fallback: {}, silent: true }
+      )
+      const rawAout = audioOutMap[modelName]
+      setAudioOutPricing(
+        rawAout
+          ? {
+              ...rawAout,
+              price_per_million_chars:
+                convertUSDToBillingDisplay(
+                  rawAout.price_per_million_chars
+                ),
+            }
+          : emptyAudioOutPricing()
+      )
     } else {
       form.reset({
         name: '',
@@ -508,10 +638,18 @@ export function ModelPricingEditorPanel({
         imageRatio: '',
         audioRatio: '',
         audioCompletionRatio: '',
+        imagePricing: '',
+        videoPricing: '',
+        audioInPricing: '',
+        audioOutPricing: '',
       })
       setPricingMode('per-token')
       setBillingExpr('')
       setRequestRuleExpr('')
+      setImagePricing(emptyImagePricing())
+      setVideoPricing(emptyVideoPricing())
+      setAudioInPricing(emptyAudioInPricing())
+      setAudioOutPricing(emptyAudioOutPricing())
     }
 
     setPromptPrice(nextLaneState.promptPrice)
@@ -642,6 +780,103 @@ export function ModelPricingEditorPanel({
     }
   }
 
+  // Structured pricing change handlers — update local state + persist to form field
+  const handleImagePricingChange = (next: ImagePricing) => {
+    setImagePricing(next)
+    const mName = form.getValues('name') || editData?.name || ''
+    if (!mName) return
+    const map = safeJsonParse<Record<string, ImagePricing>>(
+      form.getValues('imagePricing') || '{}',
+      { fallback: {}, silent: true }
+    )
+    if (next.price_per_image > 0) {
+      map[mName] = {
+        ...next,
+        price_per_image: convertBillingDisplayToUSD(next.price_per_image),
+      }
+    } else {
+      delete map[mName]
+    }
+    form.setValue(
+      'imagePricing',
+      normalizeJsonString(JSON.stringify(map)),
+      { shouldDirty: true }
+    )
+  }
+
+  const handleVideoPricingChange = (next: VideoPricing) => {
+    setVideoPricing(next)
+    const mName = form.getValues('name') || editData?.name || ''
+    if (!mName) return
+    const map = safeJsonParse<Record<string, VideoPricing>>(
+      form.getValues('videoPricing') || '{}',
+      { fallback: {}, silent: true }
+    )
+    if (next.price_per_second > 0) {
+      map[mName] = {
+        ...next,
+        price_per_second: convertBillingDisplayToUSD(next.price_per_second),
+      }
+    } else {
+      delete map[mName]
+    }
+    form.setValue(
+      'videoPricing',
+      normalizeJsonString(JSON.stringify(map)),
+      { shouldDirty: true }
+    )
+  }
+
+  const handleAudioInPricingChange = (next: AudioInPricing) => {
+    setAudioInPricing(next)
+    const mName = form.getValues('name') || editData?.name || ''
+    if (!mName) return
+    const map = safeJsonParse<Record<string, AudioInPricing>>(
+      form.getValues('audioInPricing') || '{}',
+      { fallback: {}, silent: true }
+    )
+    if (next.price_per_minute > 0) {
+      map[mName] = {
+        ...next,
+        price_per_minute: convertBillingDisplayToUSD(
+          next.price_per_minute
+        ),
+      }
+    } else {
+      delete map[mName]
+    }
+    form.setValue(
+      'audioInPricing',
+      normalizeJsonString(JSON.stringify(map)),
+      { shouldDirty: true }
+    )
+  }
+
+  const handleAudioOutPricingChange = (next: AudioOutPricing) => {
+    setAudioOutPricing(next)
+    const mName = form.getValues('name') || editData?.name || ''
+    if (!mName) return
+    const map = safeJsonParse<Record<string, AudioOutPricing>>(
+      form.getValues('audioOutPricing') || '{}',
+      { fallback: {}, silent: true }
+    )
+    if (next.price_per_million_chars > 0) {
+      map[mName] = {
+        ...next,
+        price_per_million_chars: convertBillingDisplayToUSD(
+          next.price_per_million_chars
+        ),
+      }
+    } else {
+      delete map[mName]
+    }
+    form.setValue(
+      'audioOutPricing',
+      normalizeJsonString(JSON.stringify(map)),
+      { shouldDirty: true }
+    )
+  }
+
   const watchedValues = form.watch()
   const previewRows = useMemo(
     () =>
@@ -752,6 +987,10 @@ export function ModelPricingEditorPanel({
       imageRatio: values.imageRatio || '',
       audioRatio: values.audioRatio || '',
       audioCompletionRatio: values.audioCompletionRatio || '',
+      imagePricing: values.imagePricing || '',
+      videoPricing: values.videoPricing || '',
+      audioInPricing: values.audioInPricing || '',
+      audioOutPricing: values.audioOutPricing || '',
     }
 
     if (pricingMode === 'tiered_expr') {
@@ -953,16 +1192,10 @@ export function ModelPricingEditorPanel({
                   />
                 </TabsContent>
 
-                {/* Structured pricing modes (PR-7c). These four modes exist so
-                  * the admin can classify a model as image-gen / video-gen /
-                  * audio-in / audio-out from this sheet, but the actual
-                  * multi-field editor (base price + resolution/quality/size
-                  * multipliers) lives on the model-mutate drawer under
-                  * /models/metadata → Edit → Pricing Configuration. Keeping
-                  * both places aware of the same kind vocabulary means
-                  * switching a model here nudges the admin into the correct
-                  * detailed editor without duplicating that UI's complex
-                  * validation logic. */}
+                {/* Structured pricing modes (PR-7c) — inline editors.
+                  * Each tab shows the same multi-field editor (base price +
+                  * multipliers) that previously required opening the
+                  * model-mutate drawer under Models → Metadata → Edit. */}
                 {(
                   [
                     'per-image',
@@ -976,54 +1209,35 @@ export function ModelPricingEditorPanel({
                     value={mode}
                     className='flex flex-col gap-4'
                   >
-                    <div className='border-primary/30 bg-primary/5 rounded-md border p-4 text-sm'>
-                      <p className='font-medium'>
-                        {mode === 'per-image' &&
-                          t('Image generation billing')}
-                        {mode === 'per-second' &&
-                          t('Video generation billing')}
-                        {mode === 'per-minute' &&
-                          t('Speech recognition billing')}
-                        {mode === 'per-1m-chars' &&
-                          t('Speech synthesis billing')}
-                      </p>
-                      <p className='text-muted-foreground mt-1 text-xs leading-5'>
-                        {t(
-                          'Configure detailed pricing (base price + resolution / quality / voice multipliers) on the model editor drawer at Models → Metadata → Edit. This sheet is intended for token-based ratio tuning only.'
-                        )}
-                      </p>
-                      <ul className='text-muted-foreground mt-2 list-inside list-disc space-y-0.5 text-xs'>
-                        {mode === 'per-image' && (
-                          <>
-                            <li>{t('Base: $ / image')}</li>
-                            <li>{t('Quality multipliers (hd, standard)')}</li>
-                            <li>
-                              {t('Size multipliers (1024x1024, 1024x1792)')}
-                            </li>
-                          </>
-                        )}
-                        {mode === 'per-second' && (
-                          <>
-                            <li>{t('Base: $ / second')}</li>
-                            <li>
-                              {t('Resolution multipliers (720p, 1080p, 4k)')}
-                            </li>
-                            <li>{t('Has-audio multiplier')}</li>
-                          </>
-                        )}
-                        {mode === 'per-minute' && (
-                          <>
-                            <li>{t('Base: $ / minute')}</li>
-                            <li>{t('Minimum billed minutes')}</li>
-                          </>
-                        )}
-                        {mode === 'per-1m-chars' && (
-                          <>
-                            <li>{t('Base: $ / 1M characters')}</li>
-                            <li>{t('Voice multipliers (nova, echo, ...)')}</li>
-                          </>
-                        )}
-                      </ul>
+                    <div className='rounded-md border p-4'>
+                      {mode === 'per-image' && (
+                        <ImageGenEditor
+                          value={imagePricing}
+                          onChange={handleImagePricingChange}
+                          currencyLabel={pricingCurrencyLabel}
+                        />
+                      )}
+                      {mode === 'per-second' && (
+                        <VideoGenEditor
+                          value={videoPricing}
+                          onChange={handleVideoPricingChange}
+                          currencyLabel={pricingCurrencyLabel}
+                        />
+                      )}
+                      {mode === 'per-minute' && (
+                        <AudioInEditor
+                          value={audioInPricing}
+                          onChange={handleAudioInPricingChange}
+                          currencyLabel={pricingCurrencyLabel}
+                        />
+                      )}
+                      {mode === 'per-1m-chars' && (
+                        <AudioOutEditor
+                          value={audioOutPricing}
+                          onChange={handleAudioOutPricingChange}
+                          currencyLabel={pricingCurrencyLabel}
+                        />
+                      )}
                     </div>
                   </TabsContent>
                 ))}

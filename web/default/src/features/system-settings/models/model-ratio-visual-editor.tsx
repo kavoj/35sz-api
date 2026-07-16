@@ -81,6 +81,10 @@ type ModelRatioVisualEditorProps = {
   imageRatio: string
   audioRatio: string
   audioCompletionRatio: string
+  imagePricing: string
+  videoPricing: string
+  audioInPricing: string
+  audioOutPricing: string
   billingMode: string
   billingExpr: string
   onChange: (field: string, value: string) => void
@@ -113,6 +117,10 @@ type ModelRow = {
   imageRatio?: string
   audioRatio?: string
   audioCompletionRatio?: string
+  imagePricing?: string
+  videoPricing?: string
+  audioInPricing?: string
+  audioOutPricing?: string
   billingMode?: string
   billingExpr?: string
   requestRuleExpr?: string
@@ -226,6 +234,10 @@ export const ModelRatioVisualEditor = memo(
     imageRatio,
     audioRatio,
     audioCompletionRatio,
+    imagePricing,
+    videoPricing,
+    audioInPricing,
+    audioOutPricing,
     billingMode,
     billingExpr,
     onChange,
@@ -317,6 +329,23 @@ export const ModelRatioVisualEditor = memo(
         audioCompletionRatio,
         { fallback: {}, context: 'audio completion ratios' }
       )
+      // Structured pricing maps: each is JSON string → parsed as map of model name to structured object
+      const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+        fallback: {},
+        context: 'image generation pricing',
+      })
+      const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+        fallback: {},
+        context: 'video generation pricing',
+      })
+      const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+        fallback: {},
+        context: 'audio input pricing',
+      })
+      const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+        fallback: {},
+        context: 'audio output pricing',
+      })
       const billingModeMap = safeJsonParse<Record<string, string>>(
         billingMode,
         {
@@ -341,6 +370,10 @@ export const ModelRatioVisualEditor = memo(
         ...Object.keys(imageMap),
         ...Object.keys(audioMap),
         ...Object.keys(audioCompletionMap),
+        ...Object.keys(imagePricingMap),
+        ...Object.keys(videoPricingMap),
+        ...Object.keys(audioInPricingMap),
+        ...Object.keys(audioOutPricingMap),
         ...Object.keys(billingModeMap),
         ...Object.keys(billingExprMap),
       ])
@@ -354,6 +387,10 @@ export const ModelRatioVisualEditor = memo(
         const image = imageMap[name]?.toString() || ''
         const audio = audioMap[name]?.toString() || ''
         const audioCompletion = audioCompletionMap[name]?.toString() || ''
+        const imagePricing = imagePricingMap[name] ? JSON.stringify(imagePricingMap[name], null, 2) : ''
+        const videoPricing = videoPricingMap[name] ? JSON.stringify(videoPricingMap[name], null, 2) : ''
+        const audioInPricing = audioInPricingMap[name] ? JSON.stringify(audioInPricingMap[name], null, 2) : ''
+        const audioOutPricing = audioOutPricingMap[name] ? JSON.stringify(audioOutPricingMap[name], null, 2) : ''
 
         const modeForModel = billingModeMap[name]
         if (modeForModel === 'tiered_expr') {
@@ -376,6 +413,10 @@ export const ModelRatioVisualEditor = memo(
             imageRatio: image,
             audioRatio: audio,
             audioCompletionRatio: audioCompletion,
+            imagePricing,
+            videoPricing,
+            audioInPricing,
+            audioOutPricing,
             hasConflict: false,
           }
         }
@@ -390,6 +431,10 @@ export const ModelRatioVisualEditor = memo(
           imageRatio: image,
           audioRatio: audio,
           audioCompletionRatio: audioCompletion,
+          imagePricing,
+          videoPricing,
+          audioInPricing,
+          audioOutPricing,
           billingMode: price !== '' ? 'per-request' : 'per-token',
           hasConflict:
             price !== '' &&
@@ -423,6 +468,10 @@ export const ModelRatioVisualEditor = memo(
       imageRatio,
       audioRatio,
       audioCompletionRatio,
+      imagePricing,
+      videoPricing,
+      audioInPricing,
+      audioOutPricing,
       billingMode,
       billingExpr,
       filterAddedOnly,
@@ -462,6 +511,10 @@ export const ModelRatioVisualEditor = memo(
           imageRatio: model.imageRatio,
           audioRatio: model.audioRatio,
           audioCompletionRatio: model.audioCompletionRatio,
+          imagePricing: model.imagePricing,
+          videoPricing: model.videoPricing,
+          audioInPricing: model.audioInPricing,
+          audioOutPricing: model.audioOutPricing,
           billingMode:
             model.billingMode === 'tiered_expr'
               ? 'tiered_expr'
@@ -539,6 +592,22 @@ export const ModelRatioVisualEditor = memo(
           audioCompletionRatio,
           { fallback: {}, silent: true }
         )
+        const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+          fallback: {},
+          silent: true,
+        })
+        const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+          fallback: {},
+          silent: true,
+        })
         const billingModeMap = safeJsonParse<Record<string, string>>(
           billingMode,
           { fallback: {}, silent: true }
@@ -556,6 +625,10 @@ export const ModelRatioVisualEditor = memo(
         delete imageMap[name]
         delete audioMap[name]
         delete audioCompletionMap[name]
+        delete imagePricingMap[name]
+        delete videoPricingMap[name]
+        delete audioInPricingMap[name]
+        delete audioOutPricingMap[name]
         delete billingModeMap[name]
         delete billingExprMap[name]
 
@@ -570,6 +643,10 @@ export const ModelRatioVisualEditor = memo(
           'AudioCompletionRatio',
           JSON.stringify(audioCompletionMap, null, 2)
         )
+        onChange('ImagePricing', JSON.stringify(imagePricingMap, null, 2))
+        onChange('VideoPricing', JSON.stringify(videoPricingMap, null, 2))
+        onChange('AudioInPricing', JSON.stringify(audioInPricingMap, null, 2))
+        onChange('AudioOutPricing', JSON.stringify(audioOutPricingMap, null, 2))
         onChange(
           'billing_setting.billing_mode',
           JSON.stringify(billingModeMap, null, 2)
@@ -588,6 +665,10 @@ export const ModelRatioVisualEditor = memo(
         imageRatio,
         audioRatio,
         audioCompletionRatio,
+        imagePricing,
+        videoPricing,
+        audioInPricing,
+        audioOutPricing,
         billingMode,
         billingExpr,
         onChange,
@@ -774,6 +855,23 @@ export const ModelRatioVisualEditor = memo(
           audioCompletionRatio,
           { fallback: {}, silent: true }
         )
+        // Structured pricing maps: map of model name → structured pricing object
+        const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+          fallback: {},
+          silent: true,
+        })
+        const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+          fallback: {},
+          silent: true,
+        })
         const billingModeMap = safeJsonParse<Record<string, string>>(
           billingMode,
           { fallback: {}, silent: true }
@@ -802,8 +900,38 @@ export const ModelRatioVisualEditor = memo(
           delete imageMap[name]
           delete audioMap[name]
           delete audioCompletionMap[name]
+          delete imagePricingMap[name]
+          delete videoPricingMap[name]
+          delete audioInPricingMap[name]
+          delete audioOutPricingMap[name]
           delete billingModeMap[name]
           delete billingExprMap[name]
+
+          // Parse and store structured pricing if present
+          if (data.imagePricing && data.imagePricing !== '') {
+            try {
+              const parsed = JSON.parse(data.imagePricing)
+              imagePricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.videoPricing && data.videoPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.videoPricing)
+              videoPricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.audioInPricing && data.audioInPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.audioInPricing)
+              audioInPricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.audioOutPricing && data.audioOutPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.audioOutPricing)
+              audioOutPricingMap[name] = parsed
+            } catch {}
+          }
 
           if (data.billingMode === 'tiered_expr') {
             const combined = combineBillingExpr(
@@ -850,6 +978,10 @@ export const ModelRatioVisualEditor = memo(
           'AudioCompletionRatio',
           JSON.stringify(audioCompletionMap, null, 2)
         )
+        onChange('ImagePricing', JSON.stringify(imagePricingMap, null, 2))
+        onChange('VideoPricing', JSON.stringify(videoPricingMap, null, 2))
+        onChange('AudioInPricing', JSON.stringify(audioInPricingMap, null, 2))
+        onChange('AudioOutPricing', JSON.stringify(audioOutPricingMap, null, 2))
         onChange(
           'billing_setting.billing_mode',
           JSON.stringify(billingModeMap, null, 2)
@@ -868,6 +1000,10 @@ export const ModelRatioVisualEditor = memo(
         imageRatio,
         audioRatio,
         audioCompletionRatio,
+        imagePricing,
+        videoPricing,
+        audioInPricing,
+        audioOutPricing,
         billingMode,
         billingExpr,
         onChange,

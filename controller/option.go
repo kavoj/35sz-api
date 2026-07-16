@@ -27,6 +27,10 @@ var completionRatioMetaOptionKeys = []string{
 	"ImageRatio",
 	"AudioRatio",
 	"AudioCompletionRatio",
+	"ImagePricing",
+	"VideoPricing",
+	"AudioInPricing",
+	"AudioOutPricing",
 }
 
 func isPaymentComplianceOptionKey(key string) bool {
@@ -256,6 +260,42 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "音频补全倍率设置失败: " + err.Error(),
+			})
+			return
+		}
+	case "ImagePricing":
+		err = ratio_setting.UpdateImagePricingByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Image generation pricing update failed: " + err.Error(),
+			})
+			return
+		}
+	case "VideoPricing":
+		err = ratio_setting.UpdateVideoPricingByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Video generation pricing update failed: " + err.Error(),
+			})
+			return
+		}
+	case "AudioInPricing":
+		err = ratio_setting.UpdateAudioInPricingByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Audio input pricing update failed: " + err.Error(),
+			})
+			return
+		}
+	case "AudioOutPricing":
+		err = ratio_setting.UpdateAudioOutPricingByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Audio output pricing update failed: " + err.Error(),
 			})
 			return
 		}

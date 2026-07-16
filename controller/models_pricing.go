@@ -294,6 +294,54 @@ func firstPricingVersion(pricings []model.Pricing) string {
 	return pricings[0].PricingVersion
 }
 
+// lookupVendorFillEntry consults the two vendor-level fallback layers in
+// priority order:
+//
+//   1. Runtime OptionMap["VendorOfficialPricing"] (managed by the
+//      Vendor Pricing Sync admin page, PR-7e). Highest priority after
+//      user_configured because it's the most current data available.
+//
+//   2. Compiled-in constant/vendor_official_pricing static baseline
+//      (PR-7d). Used when the admin hasn't overridden anything.
+//
+// Returns the entry plus the source label the handler should stamp. When
+// neither layer has a match, returns zero + "" (caller falls to
+// pricing_incomplete). The returned entry uses the ratio_setting-side
+// struct so callers can reuse a single copy path; the source string is
+// one of "vendor_official" | "static_baseline" | "".
+func lookupVendorFillEntry(
+	modelName, vendorSlug string,
+) (ratio_setting.VendorOfficialPricingEntry, string) {
+	// Layer 1 — runtime override.
+	if ov, ok := ratio_setting.GetVendorOfficialPricing(modelName); ok && ov.Kind != "" {
+		return ov, "vendor_official"
+	}
+
+	// Layer 2 — compiled baseline. The catalog struct is different
+	// (constant.VendorPricingEntry vs setting.VendorOfficialPricingEntry)
+	// so we copy field-by-field. Same shape, distinct types because the
+	// setting package cannot import the constant catalog (import cycle).
+	if base, ok := vendor_official_pricing.Lookup(modelName, vendorSlug); ok {
+		return ratio_setting.VendorOfficialPricingEntry{
+			Kind:                   base.Kind,
+			InputPerMillionTokens:  base.InputPerMillionTokens,
+			OutputPerMillionTokens: base.OutputPerMillionTokens,
+			PricePerImage:          base.PricePerImage,
+			QualityMultipliers:     base.QualityMultipliers,
+			SizeMultipliers:        base.SizeMultipliers,
+			PricePerSecond:         base.PricePerSecond,
+			ResolutionMultipliers:  base.ResolutionMultipliers,
+			HasAudioMultiplier:     base.HasAudioMultiplier,
+			PricePerMinute:         base.PricePerMinute,
+			MinBillMinutes:         base.MinBillMinutes,
+			PricePerMillionChars:   base.PricePerMillionChars,
+			VoiceMultipliers:       base.VoiceMultipliers,
+		}, "static_baseline"
+	}
+
+	return ratio_setting.VendorOfficialPricingEntry{}, ""
+}
+
 // buildPricingBody populates the fields relevant to `kind`, falling back
 // through three layers when the primary source is empty. Returns the body
 // AND the pricing_source label so the handler can stamp the entry.
@@ -359,7 +407,9 @@ func buildPricingBody(
 			source = "user_configured"
 			break
 		}
-		if fill := lookupVendorBaselineForChat(p.ModelName, vendorSlug); fill != nil {
+		if fill, fillSource := lookupVendorFillEntry(p.ModelName, vendorSlug); fillSource != "" &&
+			(fill.Kind == "chat" || fill.Kind == "multimodal-chat" || fill.Kind == "embedding") &&
+			(fill.InputPerMillionTokens > 0 || fill.OutputPerMillionTokens > 0) {
 			body.InputPerMillionTokens = fill.InputPerMillionTokens
 			body.OutputPerMillionTokens = fill.OutputPerMillionTokens
 			// Reverse-derive model_ratio so downstream that still consults
@@ -369,7 +419,7 @@ func buildPricingBody(
 				body.CompletionRatio = fill.OutputPerMillionTokens /
 					fill.InputPerMillionTokens
 			}
-			source = "static_baseline"
+			source = fillSource
 			break
 		}
 		body.PricingIncomplete = true
@@ -386,12 +436,12 @@ func buildPricingBody(
 			source = "user_configured"
 			break
 		}
-		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+		if fill, fillSource := lookupVendorFillEntry(p.ModelName, vendorSlug); fillSource != "" &&
 			fill.Kind == "image-gen" && fill.PricePerImage > 0 {
 			body.PricePerImage = fill.PricePerImage
 			body.QualityMultipliers = fill.QualityMultipliers
 			body.SizeMultipliers = fill.SizeMultipliers
-			source = "static_baseline"
+			source = fillSource
 			break
 		}
 		body.PricingIncomplete = true
@@ -408,12 +458,12 @@ func buildPricingBody(
 			source = "user_configured"
 			break
 		}
-		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+		if fill, fillSource := lookupVendorFillEntry(p.ModelName, vendorSlug); fillSource != "" &&
 			fill.Kind == "video-gen" && fill.PricePerSecond > 0 {
 			body.PricePerSecond = fill.PricePerSecond
 			body.ResolutionMultipliers = fill.ResolutionMultipliers
 			body.HasAudioMultiplier = fill.HasAudioMultiplier
-			source = "static_baseline"
+			source = fillSource
 			break
 		}
 		body.PricingIncomplete = true
@@ -429,11 +479,11 @@ func buildPricingBody(
 			source = "user_configured"
 			break
 		}
-		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+		if fill, fillSource := lookupVendorFillEntry(p.ModelName, vendorSlug); fillSource != "" &&
 			fill.Kind == "audio-in" && fill.PricePerMinute > 0 {
 			body.PricePerMinute = fill.PricePerMinute
 			body.MinBillMinutes = fill.MinBillMinutes
-			source = "static_baseline"
+			source = fillSource
 			break
 		}
 		body.PricingIncomplete = true
@@ -449,11 +499,11 @@ func buildPricingBody(
 			source = "user_configured"
 			break
 		}
-		if fill, ok := vendor_official_pricing.Lookup(p.ModelName, vendorSlug); ok &&
+		if fill, fillSource := lookupVendorFillEntry(p.ModelName, vendorSlug); fillSource != "" &&
 			fill.Kind == "audio-out" && fill.PricePerMillionChars > 0 {
 			body.PricePerMillionChars = fill.PricePerMillionChars
 			body.VoiceMultipliers = fill.VoiceMultipliers
-			source = "static_baseline"
+			source = fillSource
 			break
 		}
 		body.PricingIncomplete = true
@@ -462,17 +512,16 @@ func buildPricingBody(
 	return body, source
 }
 
-// lookupVendorBaselineForChat is a specialization of the generic Lookup
-// that only returns chat / multimodal-chat / embedding entries. The
-// three token-based kinds share the same static-baseline shape (a pair
-// of $ / 1M tokens), so we return a lightweight anonymous struct instead
-// of the full VendorPricingEntry.
+// lookupVendorBaselineForChat is retained for backward compatibility but
+// now delegates to lookupVendorFillEntry so both layers of vendor fallback
+// (runtime override + static baseline) get consulted. Kept for clarity in
+// case a future reader searches for the chat-specific path.
 func lookupVendorBaselineForChat(modelName, vendorSlug string) *struct {
 	InputPerMillionTokens  float64
 	OutputPerMillionTokens float64
 } {
-	entry, ok := vendor_official_pricing.Lookup(modelName, vendorSlug)
-	if !ok {
+	entry, source := lookupVendorFillEntry(modelName, vendorSlug)
+	if source == "" {
 		return nil
 	}
 	switch entry.Kind {

@@ -160,6 +160,11 @@ func InitOptionMap() {
 	common.OptionMap["VideoPricing"] = ratio_setting.VideoPricing2JSONString()
 	common.OptionMap["AudioInPricing"] = ratio_setting.AudioInPricing2JSONString()
 	common.OptionMap["AudioOutPricing"] = ratio_setting.AudioOutPricing2JSONString()
+	// Admin-editable overrides on top of the compiled-in vendor static
+	// baseline (constant/vendor_official_pricing). See PR-7e — this key
+	// lets ops paste fresh Volcano/OpenAI/etc. console prices without
+	// shipping a new binary.
+	common.OptionMap["VendorOfficialPricing"] = ratio_setting.VendorOfficialPricing2JSONString()
 	common.OptionMap["TopUpLink"] = common.TopUpLink
 	//common.OptionMap["ChatLink"] = common.ChatLink
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
@@ -566,6 +571,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateAudioInPricingByJSONString(value)
 	case "AudioOutPricing":
 		err = ratio_setting.UpdateAudioOutPricingByJSONString(value)
+	case "VendorOfficialPricing":
+		err = ratio_setting.UpdateVendorOfficialPricingByJSONString(value)
 	case "TopUpLink":
 		common.TopUpLink = value
 	//case "ChatLink":

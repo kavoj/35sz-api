@@ -79,6 +79,10 @@ type ModelJsonFieldName =
   | 'ImageRatio'
   | 'AudioRatio'
   | 'AudioCompletionRatio'
+  | 'ImagePricing'
+  | 'VideoPricing'
+  | 'AudioInPricing'
+  | 'AudioOutPricing'
 
 const modelJsonFields: Array<{
   name: ModelJsonFieldName
@@ -128,6 +132,30 @@ const modelJsonFields: Array<{
     name: 'AudioCompletionRatio',
     labelKey: 'Audio completion ratio',
     descriptionKey: 'Ratio applied to audio completions for streaming models.',
+  },
+  {
+    name: 'ImagePricing',
+    labelKey: 'Image generation pricing',
+    descriptionKey:
+      'Structured pricing for image generation models (per-image base + multipliers).',
+  },
+  {
+    name: 'VideoPricing',
+    labelKey: 'Video generation pricing',
+    descriptionKey:
+      'Structured pricing for video generation models (per-second base + multipliers).',
+  },
+  {
+    name: 'AudioInPricing',
+    labelKey: 'Audio input pricing',
+    descriptionKey:
+      'Structured pricing for speech recognition models (per-minute base).',
+  },
+  {
+    name: 'AudioOutPricing',
+    labelKey: 'Audio output pricing',
+    descriptionKey:
+      'Structured pricing for text-to-speech models (per-1M-chars base + multipliers).',
   },
 ]
 
@@ -313,6 +341,10 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               imageRatio={form.watch('ImageRatio')}
               audioRatio={form.watch('AudioRatio')}
               audioCompletionRatio={form.watch('AudioCompletionRatio')}
+              imagePricing={form.watch('ImagePricing')}
+              videoPricing={form.watch('VideoPricing')}
+              audioInPricing={form.watch('AudioInPricing')}
+              audioOutPricing={form.watch('AudioOutPricing')}
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
               filterAddedOnly={showAddedOnly}

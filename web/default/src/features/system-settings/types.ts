@@ -284,6 +284,10 @@ export type BillingSettings = {
   ImageRatio: string
   AudioRatio: string
   AudioCompletionRatio: string
+  ImagePricing: string
+  VideoPricing: string
+  AudioInPricing: string
+  AudioOutPricing: string
   ExposeRatioEnabled: boolean
   'billing_setting.billing_mode': string
   'billing_setting.billing_expr': string
@@ -496,5 +500,63 @@ export type UpstreamRatiosResponse = {
   data: {
     differences: DifferencesMap
     test_results: TestResult[]
+  }
+}
+
+// VendorOfficialPricingEntry matches the backend struct in setting/ratio_setting/vendor_official_pricing.go
+export type VendorOfficialPricingEntry = {
+  kind: string
+
+  // chat / multimodal-chat / embedding
+  input_per_million_tokens?: number
+  output_per_million_tokens?: number
+
+  // image-gen
+  price_per_image?: number
+  quality_multipliers?: Record<string, number>
+  size_multipliers?: Record<string, number>
+
+  // video-gen
+  price_per_second?: number
+  resolution_multipliers?: Record<string, number>
+  has_audio_multiplier?: number
+
+  // audio-in
+  price_per_minute?: number
+  min_bill_minutes?: number
+
+  // audio-out
+  price_per_million_chars?: number
+  voice_multipliers?: Record<string, number>
+
+  // Provenance
+  vendor?: string
+  updated_at?: number
+  updated_by?: number
+  source_notes?: string
+}
+
+export type VendorPricingOverridesResponse = {
+  success: boolean
+  message: string
+  entries: Record<string, VendorOfficialPricingEntry>
+  total_count: number
+}
+
+export type VendorPricingSyncRequest = {
+  entries: Record<string, VendorOfficialPricingEntry>
+  replace_all?: boolean
+  source_note?: string
+}
+
+export type VendorPricingSyncResponse = {
+  success: boolean
+  message: string
+  result: {
+    merged_count: number
+    replaced_count: number
+    unchanged_count: number
+    deleted_count: number
+    source_note: string
   }
 }

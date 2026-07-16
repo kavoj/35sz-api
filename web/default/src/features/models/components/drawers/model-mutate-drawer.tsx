@@ -684,6 +684,16 @@ export function ModelMutateDrawer({
       const model = modelData.data
       setOldModelName(model.model_name)
 
+      // When loading an existing model from persisted data, clear the
+      // auto-inference refs BEFORE calling form.reset because any model_type/pricing_kind that's
+      // already in the database is an explicit admin choice we must NOT overwrite.
+      // The auto-inference effects only overwrite when the last value was
+      // itself from auto-inference; with the refs cleared before form.reset
+      // triggers any re-renders, they'll see the correct starting state.
+      lastAutoModelTypeRef.current = undefined
+      lastAutoKindRef.current = undefined
+      lastCascadedModelTypeRef.current = model.model_type || 'text'
+
       // Base model data reset
       const baseModelData = {
         id: model.id,

@@ -71,6 +71,10 @@ type UpstreamRatioSyncProps = {
     ImageRatio: string
     AudioRatio: string
     AudioCompletionRatio: string
+    ImagePricing: string
+    VideoPricing: string
+    AudioInPricing: string
+    AudioOutPricing: string
     'billing_setting.billing_mode': string
     'billing_setting.billing_expr': string
   }
@@ -345,6 +349,10 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
       AudioCompletionRatio: parseJsonRecord<number>(
         modelRatios.AudioCompletionRatio
       ),
+      ImagePricing: parseJsonRecord<any>(modelRatios.ImagePricing),
+      VideoPricing: parseJsonRecord<any>(modelRatios.VideoPricing),
+      AudioInPricing: parseJsonRecord<any>(modelRatios.AudioInPricing),
+      AudioOutPricing: parseJsonRecord<any>(modelRatios.AudioOutPricing),
       ModelPrice: parseJsonRecord<number>(modelRatios.ModelPrice),
       'billing_setting.billing_mode': parseJsonRecord<string>(
         modelRatios['billing_setting.billing_mode']
@@ -385,6 +393,10 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
         ImageRatio: { ...currentRatios.ImageRatio },
         AudioRatio: { ...currentRatios.AudioRatio },
         AudioCompletionRatio: { ...currentRatios.AudioCompletionRatio },
+        ImagePricing: { ...currentRatios.ImagePricing },
+        VideoPricing: { ...currentRatios.VideoPricing },
+        AudioInPricing: { ...currentRatios.AudioInPricing },
+        AudioOutPricing: { ...currentRatios.AudioOutPricing },
         ModelPrice: { ...currentRatios.ModelPrice },
         'billing_setting.billing_mode': {
           ...currentRatios['billing_setting.billing_mode'],
@@ -409,6 +421,10 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
           delete finalRatios.ImageRatio[model]
           delete finalRatios.AudioRatio[model]
           delete finalRatios.AudioCompletionRatio[model]
+          delete finalRatios.ImagePricing[model]
+          delete finalRatios.VideoPricing[model]
+          delete finalRatios.AudioInPricing[model]
+          delete finalRatios.AudioOutPricing[model]
         }
         if (hasRatio) {
           delete finalRatios.ModelPrice[model]

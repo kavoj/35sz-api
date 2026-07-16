@@ -33,6 +33,9 @@ import type {
   UpdateOptionResponse,
   UpstreamChannelsResponse,
   UpstreamRatiosResponse,
+  VendorPricingOverridesResponse,
+  VendorPricingSyncRequest,
+  VendorPricingSyncResponse,
 } from './types'
 
 export async function getSystemOptions() {
@@ -143,5 +146,28 @@ export async function updatePaymentConfig(id: number, request: PaymentConfig) {
   if (!res.data.success) {
     throw new Error(res.data.message || 'Failed to update payment config')
   }
+  return res.data
+}
+
+// Vendor Official Pricing Sync (PR-7e)
+export async function getVendorPricingOverrides() {
+  const res = await api.get<VendorPricingOverridesResponse>(
+    '/api/vendor-pricing/overrides'
+  )
+  return res.data
+}
+
+export async function postVendorPricingSync(request: VendorPricingSyncRequest) {
+  const res = await api.post<VendorPricingSyncResponse>(
+    '/api/vendor-pricing/sync',
+    request
+  )
+  return res.data
+}
+
+export async function deleteVendorPricingOverride(modelName: string) {
+  const res = await api.delete<{ success: boolean }>(
+    `/api/vendor-pricing/overrides/${encodeURIComponent(modelName)}`
+  )
   return res.data
 }
