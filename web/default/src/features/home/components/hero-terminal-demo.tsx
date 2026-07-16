@@ -33,6 +33,7 @@ interface ApiDemoConfig {
   responseHighlights: string[]
   tokens: number
   latency: number
+  mode: string
   accent: AccentTone
 }
 
@@ -72,8 +73,8 @@ const ACCENT_CLASSES: Record<
 
 const API_DEMOS: ApiDemoConfig[] = [
   {
-    id: 'gpt-chat',
-    label: 'Chat',
+    id: 'dialogue',
+    label: '对话',
     method: 'POST',
     endpoint: '/v1/chat/completions',
     headers: ['"Authorization: Bearer sk-••••"'],
@@ -92,71 +93,81 @@ const API_DEMOS: ApiDemoConfig[] = [
     responseHighlights: ['<text>', '<tokens>'],
     tokens: 27,
     latency: 142,
+    mode: 'stream · sse',
     accent: 'emerald',
   },
   {
-    id: 'responses',
-    label: 'Responses',
+    id: 'image',
+    label: '图片',
     method: 'POST',
-    endpoint: '/v1/responses',
+    endpoint: '/v1/images/generations',
     headers: ['"Authorization: Bearer sk-••••"'],
-    request: ['"model": "your-model",', '"input": "..."'],
+    request: [
+      '"model": "your-model",',
+      '"prompt": "A serene mountain lake at sunset",',
+      '"n": 1,',
+      '"size": "1024x1024"',
+    ],
     response: [
       '{',
-      '  "output": [{ "type": "output_text", "text": <text> }],',
-      '  "usage": { "total_tokens": <tokens> }',
+      '  "created": 1734567890,',
+      '  "data": [{ "url": <url>, "revised_prompt": <text> }]',
       '}',
     ],
-    responseHighlights: ['<text>', '<tokens>'],
-    tokens: 31,
-    latency: 168,
+    responseHighlights: ['<url>', '<text>'],
+    tokens: 85,
+    latency: 3120,
+    mode: 'rest · json',
     accent: 'amber',
   },
   {
-    id: 'claude',
-    label: 'Claude',
+    id: 'video',
+    label: '视频',
     method: 'POST',
-    endpoint: '/v1/messages',
-    headers: ['"x-api-key: sk-••••"', '"anthropic-version: 2023-06-01"'],
+    endpoint: '/v1/video/generations',
+    headers: ['"Authorization: Bearer sk-••••"'],
     request: [
       '"model": "your-model",',
-      '"max_tokens": 1024,',
-      '"messages": [',
-      '  { "role": "user", "content": "..." }',
-      ']',
+      '"prompt": "A futuristic cityscape with flying cars",',
+      '"duration": 10,',
+      '"resolution": "720p"',
     ],
     response: [
       '{',
-      '  "content": [{ "type": "text", "text": <text> }],',
-      '  "usage": { "input_tokens": <in>, "output_tokens": <out> }',
+      '  "task_id": "task-<id>",',
+      '  "status": "pending",',
+      '  "estimated_time": <seconds>',
       '}',
     ],
-    responseHighlights: ['<text>', '<in>', '<out>'],
-    tokens: 29,
-    latency: 156,
+    responseHighlights: ['<id>', '<seconds>'],
+    tokens: 120,
+    latency: 500,
+    mode: 'async · polling',
     accent: 'blue',
   },
   {
-    id: 'gemini',
-    label: 'Gemini',
+    id: 'audio',
+    label: '语音',
     method: 'POST',
-    endpoint: '/v1beta/models/{model}:generateContent',
-    headers: ['"x-goog-api-key: sk-••••"'],
+    endpoint: '/v1/audio/speech',
+    headers: ['"Authorization: Bearer sk-••••"'],
     request: [
-      '"contents": [',
-      '  { "role": "user",',
-      '    "parts": [{ "text": "..." }] }',
-      ']',
+      '"model": "your-model",',
+      '"input": "欢迎使用AI语音合成服务",',
+      '"voice": "nova",',
+      '"response_format": "mp3"',
     ],
     response: [
       '{',
-      '  "candidates": [{ "content": { "parts": [{ "text": <text> }] } }],',
-      '  "usageMetadata": { "totalTokenCount": <tokens> }',
+      '  "content_type": "audio/mpeg",',
+      '  "duration_seconds": <sec>,',
+      '  "data": <binary_data>',
       '}',
     ],
-    responseHighlights: ['<text>', '<tokens>'],
-    tokens: 25,
-    latency: 93,
+    responseHighlights: ['<sec>', '<binary_data>'],
+    tokens: 45,
+    latency: 780,
+    mode: 'stream · sse',
     accent: 'violet',
   },
 ]
@@ -308,7 +319,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
             </span>
           </div>
           <span className='text-foreground/30 font-mono text-[10px] tracking-wider uppercase'>
-            stream · sse
+            {demo.mode}
           </span>
         </div>
       </div>
@@ -448,10 +459,10 @@ function renderResponseLine(line: string, demo: ApiDemoConfig): ReactNode {
 
 function truncateResponse(demo: ApiDemoConfig): string {
   const map: Record<string, string> = {
-    'gpt-chat': 'Chat request routed.',
-    responses: 'Response workflow ready.',
-    claude: 'Claude message routed.',
-    gemini: 'Gemini request served.',
+    dialogue: '对话请求已路由。',
+    image: '图片生成完成。',
+    video: '视频任务已提交。',
+    audio: '语音合成完成。',
   }
   return map[demo.id] ?? '...'
 }

@@ -23,7 +23,6 @@ import {
   BookOpen,
   Check,
   Copy,
-  Cpu,
   Handshake,
   Layers,
   Network,
@@ -37,6 +36,7 @@ import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
 
 import { StarField } from '../star-field'
+import { HeroTerminalDemo } from '../hero-terminal-demo'
 
 interface HeroProps {
   className?: string
@@ -128,7 +128,7 @@ export function Hero(props: HeroProps) {
 
       <div className='mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8'>
         {/* Left Column: Brand copy */}
-        <div className='flex flex-col items-start text-left lg:col-span-7'>
+        <div className='flex flex-col items-start text-left lg:col-span-6'>
           {/* Brand pill */}
           <div
             className='landing-animate-fade-up mb-5 inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-xs font-medium text-amber-600 opacity-0 shadow-xs dark:border-amber-400/20 dark:bg-amber-400/5 dark:text-amber-400'
@@ -226,79 +226,36 @@ export function Hero(props: HeroProps) {
           </div>
         </div>
 
-        {/* Right Column: Orbiting rings visual + Base URL */}
-        <div
-          className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-5'
-          style={{ animationDelay: '320ms' }}
-        >
-          <div className='relative w-full max-w-md'>
-            <div className='flex aspect-square items-center justify-center'>
-              {/* Outer ring */}
-              <div
-                aria-hidden
-                className='animate-orbit absolute size-72 rounded-full border border-cyan-500/10'
-                style={{ '--orbit-duration': '25s' } as React.CSSProperties}
-              >
-                <div className='absolute -top-1 left-1/2 size-2 -translate-x-1/2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]' />
-              </div>
-              {/* Middle ring */}
-              <div
-                aria-hidden
-                className='animate-orbit absolute size-56 rounded-full border border-violet-500/10'
-                style={
-                  {
-                    '--orbit-duration': '18s',
-                    animationDirection: 'reverse',
-                  } as React.CSSProperties
-                }
-              >
-                <div className='absolute -top-1 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-violet-400 shadow-[0_0_6px_rgba(167,139,250,0.6)]' />
-              </div>
-              {/* Inner ring */}
-              <div
-                aria-hidden
-                className='animate-orbit absolute size-40 rounded-full border border-amber-500/10'
-                style={{ '--orbit-duration': '12s' } as React.CSSProperties}
-              >
-                <div className='absolute -top-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]' />
-              </div>
-              {/* Center glow */}
-              <div
-                aria-hidden
-                className='absolute size-20 animate-gradient-shift rounded-full bg-gradient-to-br from-cyan-500/20 via-violet-500/20 to-amber-500/20 blur-xl'
-              />
-              <div
-                aria-hidden
-                className='absolute flex size-14 items-center justify-center rounded-full border border-foreground/10 bg-background/40 backdrop-blur-sm'
-              >
-                <Cpu className='text-foreground/70 size-6' strokeWidth={1.5} />
-              </div>
-            </div>
+        {/* Right Column: Terminal demo */}
+        <HeroTerminalDemo className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-6' />
+      </div>
 
-            {/* Base URL card */}
-            <div className='border-border/40 bg-muted/10 mt-8 flex items-center gap-2 rounded-xl border p-3 backdrop-blur-sm transition-all duration-300 hover:border-cyan-500/20 hover:bg-cyan-500/5'>
-              <div className='min-w-0 flex-1'>
-                <p className='text-muted-foreground/50 mb-0.5 text-xs font-medium tracking-wider uppercase'>
-                  {t('Base URL')}
-                </p>
-                <p className='text-foreground/80 truncate text-base font-mono font-medium tracking-tight'>
-                  {baseUrl}
-                </p>
-              </div>
-              <button
-                type='button'
-                onClick={handleCopyUrl}
-                className='border-border/40 hover:border-cyan-500/30 hover:bg-cyan-500/10 text-muted-foreground hover:text-cyan-500 flex size-9 shrink-0 items-center justify-center rounded-lg border transition-all duration-200'
-                title={t('Copy Base URL')}
-              >
-                {copied ? (
-                  <Check className='size-4 text-emerald-500' />
-                ) : (
-                  <Copy className='size-4' />
-                )}
-              </button>
-            </div>
+      {/* Base URL card (below grid) */}
+      <div
+        className='landing-animate-fade-up mx-auto mt-10 max-w-md opacity-0'
+        style={{ animationDelay: '400ms' }}
+      >
+        <div className='flex items-center gap-2 rounded-xl border border-border/50 bg-white p-3 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-cyan-400/40 hover:shadow-md dark:bg-white/95'>
+          <div className='min-w-0 flex-1'>
+            <p className='text-muted-foreground/60 mb-0.5 text-xs font-medium tracking-wider uppercase'>
+              Base URL
+            </p>
+            <p className='text-foreground truncate text-base font-mono font-medium tracking-tight'>
+              {baseUrl}
+            </p>
           </div>
+          <button
+            type='button'
+            onClick={handleCopyUrl}
+            className='flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-white text-muted-foreground transition-all duration-200 hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-500 dark:bg-white/90'
+            title={t('Copy Base URL')}
+          >
+            {copied ? (
+              <Check className='size-4 text-emerald-500' />
+            ) : (
+              <Copy className='size-4' />
+            )}
+          </button>
         </div>
       </div>
     </section>
