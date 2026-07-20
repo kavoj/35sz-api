@@ -264,7 +264,7 @@ export function ModelMutateDrawer({
   })
 
   // Fetch system options for ratio configuration
-  const { data: systemOptionsData } = useSystemOptions()
+  const { data: systemOptionsData, refetch: refetchSystemOptions } = useSystemOptions()
 
   const updateOption = useUpdateOption()
 
@@ -916,6 +916,16 @@ export function ModelMutateDrawer({
     }
   }, [open, isEditing, modelData, currentRow, form, modelSettings])
 
+  // Force-refetch system options when opening the edit drawer so
+  // structured pricing (ImagePricing, VideoPricing, etc.) always
+  // reflects the latest server state. The 5-minute staleTime on
+  // useSystemOptions() can otherwise show stale pricing values.
+  useEffect(() => {
+    if (open && isEditing) {
+      refetchSystemOptions()
+    }
+  }, [open, isEditing, refetchSystemOptions])
+
   const onSubmit = useCallback(
     async (values: ExtendedModelFormValues): Promise<void> => {
       setIsSubmitting(true)
@@ -1245,6 +1255,7 @@ export function ModelMutateDrawer({
           )
           queryClient.invalidateQueries({ queryKey: modelsQueryKeys.lists() })
           queryClient.invalidateQueries({ queryKey: ['system-options'] })
+          queryClient.invalidateQueries({ queryKey: modelsQueryKeys.detail(currentRow!.id) })
           onOpenChange(false)
         } else {
           toast.error(response.message || 'Operation failed')
