@@ -75,6 +75,9 @@ const getAllIconKeys = () => {
       continue
     // Skip if key is not a valid component name
     if (!/^[A-Z]/.test(key)) continue
+    // Skip non-React exports (ModelProvider enum, etc.) that are plain
+    // objects without $$typeof — they would crash when rendered as JSX.
+    if (value && typeof value === 'object' && !(value as Record<string, unknown>)['$$typeof']) continue
 
     keys.push(key)
 

@@ -122,9 +122,14 @@ export function getLobeIcon(
   }
 
   // Fallback if icon not found
+  // Also guard against plain objects (non-React exports like ModelProvider
+  // enum) that have typeof === 'object' but lack $$typeof — rendering them
+  // as JSX would throw React error #130.
   if (
     !IconComponent ||
-    (typeof IconComponent !== 'function' && typeof IconComponent !== 'object')
+    (typeof IconComponent !== 'function' && typeof IconComponent !== 'object') ||
+    (typeof IconComponent === 'object' &&
+      !(IconComponent as Record<string, unknown>)['$$typeof'])
   ) {
     const firstLetter = trimmedName.charAt(0).toUpperCase()
     return (
