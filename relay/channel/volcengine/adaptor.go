@@ -32,6 +32,24 @@ const (
 type Adaptor struct {
 }
 
+func normalizeVolcengineBaseURL(baseURL string) string {
+	return strings.TrimRight(strings.TrimSpace(baseURL), "/")
+}
+
+func isVolcengineAgentPlanBase(baseURL string) bool {
+	baseURL = normalizeVolcengineBaseURL(baseURL)
+	return baseURL == "https://ark.cn-beijing.volces.com/api/plan" ||
+		baseURL == "https://ark.cn-beijing.volces.com/api/plan/v3"
+}
+
+func buildVolcengineURL(baseURL, regularPath, agentPlanPath string) string {
+	baseURL = normalizeVolcengineBaseURL(baseURL)
+	if isVolcengineAgentPlanBase(baseURL) {
+		return baseURL + agentPlanPath
+	}
+	return baseURL + regularPath
+}
+
 func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
 	//TODO implement me
 	return nil, errors.New("not implemented")
@@ -47,6 +65,42 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
+	// ASR (transcription) — parse multipart form, store audio in context
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		asrData, err := parseASRMultipartForm(c)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ASR multipart form: %w", err)
+		}
+		c.Set(contextKeyASRData, asrData)
+
+		// Parse request metadata for ASR endpoint selection
+		// ("bigmodel_async" default, "bigmodel_nostream" for unidirectional)
+		if len(request.Metadata) > 0 {
+			var asrMeta struct {
+				ASREndpoint string `json:"asr_endpoint"`
+			}
+			if json.Unmarshal(request.Metadata, &asrMeta) == nil && asrMeta.ASREndpoint != "" {
+				c.Set("volcengine_asr_endpoint", asrMeta.ASREndpoint)
+			}
+		}
+
+		// WebSocket ASR is only available for VolcEngine and Agent Plan
+		// base URLs. For custom base URLs, the request follows the normal
+		// HTTP path via DoApiRequest.
+		baseUrl := info.ChannelBaseUrl
+		if baseUrl == "" {
+			baseUrl = channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine]
+		}
+		if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl) {
+			info.IsStream = true
+			return bytes.NewReader(nil), nil
+		}
+		// Non-Volcengine/Agent-Plan base URL: the request will follow
+		// the normal HTTP path (DoApiRequest → GetRequestURL returns
+		// an HTTP /v1/audio/transcriptions endpoint).
+		return bytes.NewReader(nil), nil
+	}
+
 	if info.RelayMode != constant.RelayModeAudioSpeech {
 		return nil, errors.New("unsupported audio relay mode")
 	}
@@ -249,9 +303,9 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			return fmt.Sprintf("%s/v1/messages", specialPlan.ClaudeBaseURL), nil
 		}
 		if strings.HasPrefix(info.UpstreamModelName, "bot") {
-			return fmt.Sprintf("%s/api/v3/bots/chat/completions", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/bots/chat/completions", "/bots/chat/completions"), nil
 		}
-		return fmt.Sprintf("%s/api/v3/chat/completions", baseUrl), nil
+		return buildVolcengineURL(baseUrl, "/api/v3/chat/completions", "/chat/completions"), nil
 	default:
 		switch info.RelayMode {
 		case constant.RelayModeChatCompletions:
@@ -259,25 +313,36 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 				return fmt.Sprintf("%s/chat/completions", specialPlan.OpenAIBaseURL), nil
 			}
 			if strings.HasPrefix(info.UpstreamModelName, "bot") {
-				return fmt.Sprintf("%s/api/v3/bots/chat/completions", baseUrl), nil
+				return buildVolcengineURL(baseUrl, "/api/v3/bots/chat/completions", "/bots/chat/completions"), nil
 			}
-			return fmt.Sprintf("%s/api/v3/chat/completions", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/chat/completions", "/chat/completions"), nil
 		case constant.RelayModeEmbeddings:
-			return fmt.Sprintf("%s/api/v3/embeddings", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/embeddings", "/embeddings"), nil
 		//豆包的图生图也走generations接口: https://www.volcengine.com/docs/82379/1824121
 		case constant.RelayModeImagesGenerations, constant.RelayModeImagesEdits:
-			return fmt.Sprintf("%s/api/v3/images/generations", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/images/generations", "/images/generations"), nil
 		//case constant.RelayModeImagesEdits:
 		//	return fmt.Sprintf("%s/api/v3/images/edits", baseUrl), nil
 		case constant.RelayModeRerank:
-			return fmt.Sprintf("%s/api/v3/rerank", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/rerank", "/rerank"), nil
 		case constant.RelayModeResponses:
-			return fmt.Sprintf("%s/api/v3/responses", baseUrl), nil
+			return buildVolcengineURL(baseUrl, "/api/v3/responses", "/responses"), nil
 		case constant.RelayModeAudioSpeech:
-			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] {
+			// TTS uses the OpenSpeech service, not the Ark API.
+			// Agent Plan endpoints do not support TTS at all —
+			// fall back to the standard WebSocket TTS endpoint.
+			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl) {
 				return "wss://openspeech.bytedance.com/api/v1/tts/ws_binary", nil
 			}
 			return fmt.Sprintf("%s/v1/audio/speech", baseUrl), nil
+		case constant.RelayModeAudioTranscription:
+			// ASR uses the OpenSpeech SeedASR service, not the Ark API.
+			// Agent Plan and default VolcEngine endpoints do not support
+			// ASR — fall back to the WebSocket ASR endpoint.
+			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl) {
+				return asrDefaultEndpoint, nil
+			}
+			return fmt.Sprintf("%s/v1/audio/transcriptions", baseUrl), nil
 		default:
 		}
 	}
@@ -330,17 +395,11 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
-	if info.RelayMode == constant.RelayModeAudioSpeech {
-		baseUrl := info.ChannelBaseUrl
-		if baseUrl == "" {
-			baseUrl = channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine]
-		}
-
-		if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] {
-			if info.IsStream {
-				return nil, nil
-			}
-		}
+	// Audio (TTS & ASR) may use WebSocket — ConvertAudioRequest sets
+	// IsStream = true for WebSocket-capable channels. In that case
+	// DoResponse handles the full lifecycle; skip the HTTP call.
+	if (info.RelayMode == constant.RelayModeAudioSpeech || info.RelayMode == constant.RelayModeAudioTranscription) && info.IsStream {
+		return nil, nil
 	}
 	return channel.DoApiRequest(a, c, info, requestBody)
 }
@@ -386,6 +445,38 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 			return handleTTSWebSocketResponse(c, requestURL, volcRequest, info, encoding)
 		}
 		return handleTTSResponse(c, resp, info, encoding)
+	}
+
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		if info.IsStream {
+			asrDataInterface, exists := c.Get(contextKeyASRData)
+			if !exists {
+				return nil, types.NewErrorWithStatusCode(
+					errors.New("volcengine ASR data not found in context"),
+					types.ErrorCodeBadRequestBody,
+					http.StatusInternalServerError,
+				)
+			}
+
+			asrData, ok := asrDataInterface.(*asrContextData)
+			if !ok {
+				return nil, types.NewErrorWithStatusCode(
+					errors.New("invalid volcengine ASR data type"),
+					types.ErrorCodeBadRequestBody,
+					http.StatusInternalServerError,
+				)
+			}
+
+			// Select ASR WebSocket endpoint from context metadata.
+			// Default: bigmodel_async (bidirectional).
+			// Alternative: bigmodel_nostream (unidirectional, higher accuracy).
+			asrEndpoint := c.GetString("volcengine_asr_endpoint")
+			requestURL := asrDefaultEndpoint
+			if asrEndpoint == "bigmodel_nostream" {
+				requestURL = asrNoStreamEndpoint
+			}
+			return handleASRWebSocketResponse(c, requestURL, asrData, info)
+		}
 	}
 
 	adaptor := openai.Adaptor{}

@@ -273,6 +273,11 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			requestPath = "/v1/images/generations"
 		}
 
+		// VolcEngine ASR (SeedASR) models
+		if channel.Type == constant.ChannelTypeVolcEngine && isAudioTranscriptionModel(testModel) {
+			requestPath = "/v1/audio/transcriptions"
+		}
+
 		// responses-only models
 		if strings.Contains(strings.ToLower(testModel), "codex") {
 			requestPath = "/v1/responses"
@@ -341,6 +346,9 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			relayFormat = types.RelayFormatOpenAIImage
 		case constant.EndpointTypeEmbeddings:
 			relayFormat = types.RelayFormatEmbedding
+		case constant.EndpointTypeAudioSpeech,
+			constant.EndpointTypeAudioTranscription:
+			relayFormat = types.RelayFormatOpenAIAudio
 		default:
 			relayFormat = types.RelayFormatOpenAI
 		}
@@ -367,6 +375,9 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 		}
 		if strings.HasPrefix(c.Request.URL.Path, "/v1/responses/compact") {
 			relayFormat = types.RelayFormatOpenAIResponsesCompaction
+		}
+		if c.Request.URL.Path == "/v1/audio/speech" || c.Request.URL.Path == "/v1/audio/transcriptions" {
+			relayFormat = types.RelayFormatOpenAIAudio
 		}
 	}
 
@@ -507,6 +518,18 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 				newAPIError: types.NewError(errors.New("invalid response compaction request type"), types.ErrorCodeConvertRequestFailed),
 			}
 		}
+	case relayconstant.RelayModeAudioSpeech,
+		relayconstant.RelayModeAudioTranscription:
+		if audioReq, ok := request.(*dto.AudioRequest); ok {
+			convertedRequest, err = adaptor.ConvertAudioRequest(c, info, *audioReq)
+		} else {
+			return testResult{
+				context:     c,
+				localErr:    errors.New("invalid audio request type"),
+				newAPIError: types.NewError(errors.New("invalid audio request type"), types.ErrorCodeConvertRequestFailed),
+			}
+		}
+
 	default:
 		switch req := request.(type) {
 		case *dto.GeneralOpenAIRequest:
@@ -833,6 +856,35 @@ func detectErrorMessageFromJSONBytes(jsonBytes []byte) string {
 	return message
 }
 
+// isAudioTranscriptionModel reports whether a model name identifies a speech
+// recognition model, which must be tested against /v1/audio/transcriptions
+// rather than the chat endpoint. Matching is on the "asr" token rather than a
+// bare substring so unrelated names that merely contain those letters (for
+// example "asratchet") keep the default chat behaviour.
+func isAudioTranscriptionModel(modelName string) bool {
+	lower := strings.ToLower(modelName)
+	for _, part := range strings.FieldsFunc(lower, func(r rune) bool {
+		return r == '.' || r == '-' || r == '_' || r == '/' || r == ':'
+	}) {
+		if part == "asr" || strings.HasSuffix(part, "asr") {
+			return true
+		}
+	}
+	return false
+}
+
+func buildImageTestRequest(modelName string, channel *model.Channel) *dto.ImageRequest {
+	size := "1024x1024"
+	if channel != nil && channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(strings.ToLower(modelName), "seedream") {
+		size = "2K"
+	}
+	return &dto.ImageRequest{
+		Model:  modelName,
+		Prompt: "a cute cat",
+		N:      lo.ToPtr(uint(1)),
+		Size:   size,
+	}
+}
 func buildTestRequest(model string, endpointType string, channel *model.Channel, isStream bool) dto.Request {
 	testResponsesInput := json.RawMessage(`[{"role":"user","content":"hi"}]`)
 
@@ -936,6 +988,15 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			Model: model,
 			Input: []any{"hello world"},
 		}
+	}
+
+	if channel != nil && channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(strings.ToLower(model), "seedream") {
+		return buildImageTestRequest(model, channel)
+	}
+
+	// ASR (SeedASR) models
+	if isAudioTranscriptionModel(model) {
+		return &dto.AudioRequest{Model: model}
 	}
 
 	// Responses compaction models (must use /v1/responses/compact)
