@@ -197,6 +197,14 @@ const endpointTypeOptions: Array<{ value: string; label: string }> = [
     label: 'Image Generation (/v1/images/generations)',
   },
   { value: 'embeddings', label: 'Embeddings (/v1/embeddings)' },
+  {
+    value: 'audio-speech',
+    label: 'Audio Speech (/v1/audio/speech)',
+  },
+  {
+    value: 'audio-transcription',
+    label: 'Audio Transcription (/v1/audio/transcriptions)',
+  },
 ]
 
 const endpointSelectContentClass = 'w-[460px] max-w-[calc(100vw-2rem)]'

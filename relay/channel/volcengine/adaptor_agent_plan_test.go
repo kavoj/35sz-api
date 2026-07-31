@@ -140,3 +140,112 @@ func TestVolcengineAgentPlanDoesNotAffectSpecialBases(t *testing.T) {
 		t.Fatalf("special base URL = %q, want %q", got, want)
 	}
 }
+
+func TestVolcengineAgentPlanAudioSpeechURL(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	// Agent Plan base URL + AudioSpeech → should fall back to WebSocket TTS
+	// because Agent Plan does not support TTS.
+	info := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioSpeech,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3",
+		},
+	}
+	got, err := adaptor.GetRequestURL(info)
+	if err != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err)
+	}
+	want := "wss://openspeech.bytedance.com/api/v1/tts/ws_binary"
+	if got != want {
+		t.Fatalf("Agent Plan TTS URL = %q, want %q", got, want)
+	}
+
+	// Regular (default) VolcEngine + AudioSpeech → WebSocket TTS (existing behavior)
+	info2 := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioSpeech,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://ark.cn-beijing.volces.com",
+		},
+	}
+	got2, err2 := adaptor.GetRequestURL(info2)
+	if err2 != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err2)
+	}
+	if got2 != want {
+		t.Fatalf("Regular TTS URL = %q, want %q", got2, want)
+	}
+
+	// Custom (non-Agent-Plan, non-default) base URL + AudioSpeech → HTTP
+	info3 := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioSpeech,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://custom-tts.example.com",
+		},
+	}
+	got3, err3 := adaptor.GetRequestURL(info3)
+	if err3 != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err3)
+	}
+	want3 := "https://custom-tts.example.com/v1/audio/speech"
+	if got3 != want3 {
+		t.Fatalf("Custom base TTS URL = %q, want %q", got3, want3)
+	}
+}
+
+func TestVolcengineAgentPlanASRURL(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	// Agent Plan base URL + AudioTranscription → should fall back to ASR WebSocket
+	info := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioTranscription,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3",
+		},
+	}
+	got, err := adaptor.GetRequestURL(info)
+	if err != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err)
+	}
+	want := "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_async"
+	if got != want {
+		t.Fatalf("Agent Plan ASR URL = %q, want %q", got, want)
+	}
+
+	// Regular (default) VolcEngine + AudioTranscription → WebSocket ASR
+	info2 := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioTranscription,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://ark.cn-beijing.volces.com",
+		},
+	}
+	got2, err2 := adaptor.GetRequestURL(info2)
+	if err2 != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err2)
+	}
+	if got2 != want {
+		t.Fatalf("Regular ASR URL = %q, want %q", got2, want)
+	}
+
+	// Custom (non-Agent-Plan, non-default) base URL + AudioTranscription → HTTP
+	info3 := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeAudioTranscription,
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: "https://custom-asr.example.com",
+		},
+	}
+	got3, err3 := adaptor.GetRequestURL(info3)
+	if err3 != nil {
+		t.Fatalf("GetRequestURL returned error: %v", err3)
+	}
+	want3 := "https://custom-asr.example.com/v1/audio/transcriptions"
+	if got3 != want3 {
+		t.Fatalf("Custom base ASR URL = %q, want %q", got3, want3)
+	}
+}

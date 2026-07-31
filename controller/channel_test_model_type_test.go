@@ -82,3 +82,42 @@ func TestEndpointTypeFromModelType(t *testing.T) {
 		}
 	}
 }
+
+// ASR models must be routed to /v1/audio/transcriptions instead of the chat
+// endpoint, so buildTestRequest has to return an AudioRequest for them. The
+// match is token-based: a bare "contains asr" check would also capture
+// unrelated model names.
+func TestIsAudioTranscriptionModel(t *testing.T) {
+	for _, tc := range []struct {
+		model string
+		want  bool
+	}{
+		{"volc.seedasr.sauc.duration", true},
+		{"doubao-seed-asr-2.0", true},
+		{"volc.bigasr.sauc.duration", true},
+		{"ASR", true},
+		{"whisper-1", false},
+		{"seed-tts-2.0", false},
+		{"gpt-4o", false},
+		{"", false},
+		// must not match names that merely contain the letters "asr"
+		{"asratchet-v1", false},
+		{"disaster-model", false},
+	} {
+		if got := isAudioTranscriptionModel(tc.model); got != tc.want {
+			t.Errorf("isAudioTranscriptionModel(%q) = %v, want %v", tc.model, got, tc.want)
+		}
+	}
+}
+
+func TestBuildTestRequestASRModelUsesAudioRequest(t *testing.T) {
+	ch := &model.Channel{Type: constant.ChannelTypeVolcEngine}
+	req := buildTestRequest("volc.seedasr.sauc.duration", "", ch, false)
+	audio, ok := req.(*dto.AudioRequest)
+	if !ok {
+		t.Fatalf("buildTestRequest returned %T, want *dto.AudioRequest", req)
+	}
+	if audio.Model != "volc.seedasr.sauc.duration" {
+		t.Fatalf("audio test model = %q, want volc.seedasr.sauc.duration", audio.Model)
+	}
+}

@@ -41,6 +41,7 @@ const (
 
 const (
 	CompressionNone CompressionBits = 0
+	CompressionGzip CompressionBits = 0b1
 )
 
 const (
