@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/samber/lo"
 )
 
 type VolcengineTTSRequest struct {
@@ -96,6 +97,30 @@ var openAIToVolcengineVoiceMap = map[string]string{
 	"onyx":    "zh_male_zhibei_mars_bigtts",
 	"nova":    "zh_female_shuangkuaisisi_mars_bigtts",
 	"shimmer": "zh_female_cancan_mars_bigtts",
+}
+
+const (
+	ttsAgentPlanEndpoint          = "wss://openspeech.bytedance.com/api/v3/plan/tts/bidirection"
+	ttsAgentPlanResourceID        = "seed-tts-2.0"
+	contextKeyAgentPlanTTSRequest = "volcengine_agent_plan_tts_request"
+)
+
+type VolcengineAgentPlanTTSRequest struct {
+	User      VolcengineTTSUser               `json:"user"`
+	Namespace string                          `json:"namespace"`
+	ReqParams VolcengineAgentPlanTTSReqParams `json:"req_params"`
+}
+
+type VolcengineAgentPlanTTSReqParams struct {
+	Text        string                         `json:"text,omitempty"`
+	Speaker     string                         `json:"speaker"`
+	AudioParams VolcengineAgentPlanAudioParams `json:"audio_params"`
+}
+
+type VolcengineAgentPlanAudioParams struct {
+	Format     string `json:"format"`
+	SampleRate int    `json:"sample_rate"`
+	SpeechRate int    `json:"speech_rate,omitempty"`
 }
 
 var responseFormatToEncodingMap = map[string]string{
@@ -194,6 +219,167 @@ func handleTTSResponse(c *gin.Context, resp *http.Response, info *relaycommon.Re
 
 func generateRequestID() string {
 	return uuid.New().String()
+}
+
+func isAgentPlanTTSBase(baseURL string) bool {
+	baseURL = normalizeVolcengineBaseURL(baseURL)
+	return baseURL == "https://ark.cn-beijing.volces.com" || isVolcengineAgentPlanBase(baseURL)
+}
+
+func isAgentPlanTTS(info *relaycommon.RelayInfo) bool {
+	return strings.HasPrefix(strings.TrimSpace(info.ApiKey), "ark-") && isAgentPlanTTSBase(info.ChannelBaseUrl)
+}
+
+func agentPlanVoice(voice string) string {
+	if voice == "" {
+		return "zh_female_vv_uranus_bigtts"
+	}
+	switch strings.ToLower(voice) {
+	case "alloy", "fable", "nova", "shimmer":
+		return "zh_female_vv_uranus_bigtts"
+	case "echo", "onyx":
+		return "zh_male_yuanboxiaoshu_moon_bigtts"
+	default:
+		return voice
+	}
+}
+
+func buildAgentPlanTTSRequest(request dto.AudioRequest) VolcengineAgentPlanTTSRequest {
+	speedRatio := lo.FromPtrOr(request.Speed, 1.0)
+	speechRate := int((speedRatio - 1) * 100)
+	if speechRate < -50 {
+		speechRate = -50
+	}
+	if speechRate > 100 {
+		speechRate = 100
+	}
+	encoding := mapEncoding(request.ResponseFormat)
+	return VolcengineAgentPlanTTSRequest{
+		User:      VolcengineTTSUser{UID: generateRequestID()},
+		Namespace: "BidirectionalTTS",
+		ReqParams: VolcengineAgentPlanTTSReqParams{
+			Text:    request.Input,
+			Speaker: agentPlanVoice(request.Voice),
+			AudioParams: VolcengineAgentPlanAudioParams{
+				Format:     encoding,
+				SampleRate: 24000,
+				SpeechRate: speechRate,
+			},
+		},
+	}
+}
+
+func buildAgentPlanTTSHeaders(apiKey string) http.Header {
+	header := http.Header{}
+	header.Set("X-Api-Key", strings.TrimSpace(apiKey))
+	header.Set("X-Api-Resource-Id", ttsAgentPlanResourceID)
+	header.Set("X-Api-Connect-Id", uuid.New().String())
+	return header
+}
+
+func handleAgentPlanTTSWebSocketResponse(c *gin.Context, requestURL string, info *relaycommon.RelayInfo, encoding string) (usage any, err *types.NewAPIError) {
+	requestValue, exists := c.Get(contextKeyAgentPlanTTSRequest)
+	if !exists {
+		return nil, types.NewErrorWithStatusCode(errors.New("volcengine Agent Plan TTS request not found in context"), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+	request, ok := requestValue.(VolcengineAgentPlanTTSRequest)
+	if !ok {
+		return nil, types.NewErrorWithStatusCode(errors.New("invalid volcengine Agent Plan TTS request type"), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+
+	conn, resp, dialErr := websocket.DefaultDialer.DialContext(context.Background(), requestURL, buildAgentPlanTTSHeaders(info.ApiKey))
+	if dialErr != nil {
+		if resp != nil {
+			return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to connect to Agent Plan TTS websocket: %w, status: %d", dialErr, resp.StatusCode), types.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
+		}
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to connect to Agent Plan TTS websocket: %w", dialErr), types.ErrorCodeBadResponseStatusCode, http.StatusBadGateway)
+	}
+	defer conn.Close()
+
+	sessionID := uuid.New().String()
+	sendEvent := func(event EventType, session string, payload any) error {
+		message, messageErr := NewMessage(MsgTypeFullClientRequest, MsgTypeFlagWithEvent)
+		if messageErr != nil {
+			return messageErr
+		}
+		message.EventType = event
+		message.SessionID = session
+		if payload == nil {
+			message.Payload = []byte("{}")
+		} else {
+			message.Payload, messageErr = json.Marshal(payload)
+			if messageErr != nil {
+				return messageErr
+			}
+		}
+		frame, messageErr := message.Marshal()
+		if messageErr != nil {
+			return messageErr
+		}
+		return conn.WriteMessage(websocket.BinaryMessage, frame)
+	}
+
+	if err := sendEvent(EventType_StartConnection, "", nil); err != nil {
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to start Agent Plan TTS connection: %w", err), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+	message, recvErr := ReceiveMessage(conn)
+	if recvErr != nil || message.EventType != EventType_ConnectionStarted {
+		if recvErr == nil && message.MsgType == MsgTypeError {
+			return nil, types.NewErrorWithStatusCode(fmt.Errorf("Agent Plan TTS connection error: code=%d, %s", message.ErrorCode, string(message.Payload)), types.ErrorCodeBadResponse, http.StatusBadGateway)
+		}
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to start Agent Plan TTS session: %w", recvErr), types.ErrorCodeBadResponse, http.StatusBadGateway)
+	}
+
+	startPayload := request
+	if err := sendEvent(EventType_StartSession, sessionID, startPayload); err != nil {
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to start Agent Plan TTS session: %w", err), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+	message, recvErr = ReceiveMessage(conn)
+	if recvErr != nil || message.EventType != EventType_SessionStarted {
+		if recvErr == nil && message.MsgType == MsgTypeError {
+			return nil, types.NewErrorWithStatusCode(fmt.Errorf("Agent Plan TTS session error: code=%d, %s", message.ErrorCode, string(message.Payload)), types.ErrorCodeBadResponse, http.StatusBadGateway)
+		}
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to start Agent Plan TTS session: %w", recvErr), types.ErrorCodeBadResponse, http.StatusBadGateway)
+	}
+
+	if err := sendEvent(EventType_TaskRequest, sessionID, request); err != nil {
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to send Agent Plan TTS request: %w", err), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+	if err := sendEvent(EventType_FinishSession, sessionID, nil); err != nil {
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to finish Agent Plan TTS request: %w", err), types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+	}
+
+	c.Header("Content-Type", getContentTypeByEncoding(encoding))
+	c.Header("Transfer-Encoding", "chunked")
+	for {
+		message, recvErr = ReceiveMessage(conn)
+		if recvErr != nil {
+			if websocket.IsCloseError(recvErr, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				break
+			}
+			return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to receive Agent Plan TTS message: %w", recvErr), types.ErrorCodeBadResponse, http.StatusBadGateway)
+		}
+		if message.MsgType == MsgTypeError {
+			return nil, types.NewErrorWithStatusCode(fmt.Errorf("Agent Plan TTS error: code=%d, %s", message.ErrorCode, string(message.Payload)), types.ErrorCodeBadResponse, http.StatusBadGateway)
+		}
+		switch message.MsgType {
+		case MsgTypeAudioOnlyServer:
+			if len(message.Payload) > 0 {
+				if _, writeErr := c.Writer.Write(message.Payload); writeErr != nil {
+					return nil, types.NewErrorWithStatusCode(fmt.Errorf("failed to write Agent Plan TTS audio: %w", writeErr), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+				}
+				c.Writer.Flush()
+			}
+		case MsgTypeFullServerResponse:
+			if message.EventType == EventType_TTSEnded || message.EventType == EventType_SessionFinished {
+				c.Status(http.StatusOK)
+				return &dto.Usage{PromptTokens: info.GetEstimatePromptTokens(), TotalTokens: info.GetEstimatePromptTokens()}, nil
+			}
+		}
+	}
+
+	c.Status(http.StatusOK)
+	return &dto.Usage{PromptTokens: info.GetEstimatePromptTokens(), TotalTokens: info.GetEstimatePromptTokens()}, nil
 }
 
 func handleTTSWebSocketResponse(c *gin.Context, requestURL string, volcRequest VolcengineTTSRequest, info *relaycommon.RelayInfo, encoding string) (usage any, err *types.NewAPIError) {
