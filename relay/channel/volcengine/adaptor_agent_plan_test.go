@@ -153,11 +153,12 @@ func TestVolcengineAgentPlanAudioSpeechURL(t *testing.T) {
 			ChannelBaseUrl: "https://ark.cn-beijing.volces.com/api/plan/v3",
 		},
 	}
+	info.ChannelMeta.ApiKey = "ark-test-key"
 	got, err := adaptor.GetRequestURL(info)
 	if err != nil {
 		t.Fatalf("GetRequestURL returned error: %v", err)
 	}
-	want := "wss://openspeech.bytedance.com/api/v1/tts/ws_binary"
+	want := ttsAgentPlanEndpoint
 	if got != want {
 		t.Fatalf("Agent Plan TTS URL = %q, want %q", got, want)
 	}
@@ -174,8 +175,8 @@ func TestVolcengineAgentPlanAudioSpeechURL(t *testing.T) {
 	if err2 != nil {
 		t.Fatalf("GetRequestURL returned error: %v", err2)
 	}
-	if got2 != want {
-		t.Fatalf("Regular TTS URL = %q, want %q", got2, want)
+	if got2 != "wss://openspeech.bytedance.com/api/v1/tts/ws_binary" {
+		t.Fatalf("Regular legacy TTS URL = %q", got2)
 	}
 
 	// Custom (non-Agent-Plan, non-default) base URL + AudioSpeech → HTTP

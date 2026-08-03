@@ -105,6 +105,13 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 		return nil, errors.New("unsupported audio relay mode")
 	}
 
+	if isAgentPlanTTS(info) {
+		c.Set(contextKeyAgentPlanTTSRequest, buildAgentPlanTTSRequest(request))
+		c.Set(contextKeyResponseFormat, mapEncoding(request.ResponseFormat))
+		info.IsStream = true
+		return bytes.NewReader(nil), nil
+	}
+
 	appID, token, err := parseVolcengineAuth(info.ApiKey)
 	if err != nil {
 		return nil, err
@@ -328,10 +335,10 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		case constant.RelayModeResponses:
 			return buildVolcengineURL(baseUrl, "/api/v3/responses", "/responses"), nil
 		case constant.RelayModeAudioSpeech:
-			// TTS uses the OpenSpeech service, not the Ark API.
-			// Agent Plan endpoints do not support TTS at all —
-			// fall back to the standard WebSocket TTS endpoint.
-			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl) {
+			if isAgentPlanTTS(info) {
+				return ttsAgentPlanEndpoint, nil
+			}
+			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] {
 				return "wss://openspeech.bytedance.com/api/v1/tts/ws_binary", nil
 			}
 			return fmt.Sprintf("%s/v1/audio/speech", baseUrl), nil
@@ -415,6 +422,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	if info.RelayMode == constant.RelayModeAudioSpeech {
 		encoding := mapEncoding(c.GetString(contextKeyResponseFormat))
 		if info.IsStream {
+			if isAgentPlanTTS(info) {
+				requestURL, urlErr := a.GetRequestURL(info)
+				if urlErr != nil {
+					return nil, types.NewErrorWithStatusCode(urlErr, types.ErrorCodeBadRequestBody, http.StatusInternalServerError)
+				}
+				return handleAgentPlanTTSWebSocketResponse(c, requestURL, info, encoding)
+			}
 			volcRequestInterface, exists := c.Get(contextKeyTTSRequest)
 			if !exists {
 				return nil, types.NewErrorWithStatusCode(
