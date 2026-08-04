@@ -22,6 +22,7 @@ import {
   Gauge,
   KeyRound,
   ScrollText,
+  ShieldCheck,
   Sigma,
   Zap,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
+import { cn } from '@/lib/utils'
 
 import {
   buildRateLimits,
@@ -48,6 +50,7 @@ import {
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
+import { inferApiInfo } from '../lib/model-metadata'
 import type { PricingModel } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -721,6 +724,7 @@ function RateLimitsSection(props: { model: PricingModel }) {
   )
 }
 
+
 // ---------------------------------------------------------------------------
 // Authentication preview
 // ---------------------------------------------------------------------------
@@ -882,39 +886,5 @@ function InfoCell(props: { label: string; children: React.ReactNode }) {
       </span>
       {props.children}
     </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Authentication preview
-// ---------------------------------------------------------------------------
-
-function AuthSection() {
-  const { t } = useTranslation()
-  return (
-    <section>
-      <SectionTitle icon={KeyRound}>{t('Authentication')}</SectionTitle>
-      <div className='border-border/60 bg-muted/20 flex items-start gap-2 rounded-lg border p-3'>
-        <ChevronRight className='text-muted-foreground mt-0.5 size-3.5 shrink-0' />
-        <div className='space-y-1.5 text-xs leading-relaxed'>
-          <p>
-            {t('All requests must include')}{' '}
-            <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
-              Authorization: Bearer &lt;TOKEN&gt;
-            </code>{' '}
-            {t('header. Anthropic-formatted endpoints accept the')}{' '}
-            <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
-              x-api-key
-            </code>{' '}
-            {t('header instead.')}
-          </p>
-          <p className='text-muted-foreground'>
-            {t(
-              'Generate tokens from the Tokens page; you can scope them to specific models, groups, IPs, and rate-limits.'
-            )}
-          </p>
-        </div>
-      </div>
-    </section>
   )
 }
