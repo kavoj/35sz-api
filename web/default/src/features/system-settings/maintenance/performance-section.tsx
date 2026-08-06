@@ -333,6 +333,7 @@ export function PerformanceSection(props: Props) {
     }
   }
 
+  const diskEnabled = form.watch('performance_setting.disk_cache_enabled')
   const monitorEnabled = form.watch('performance_setting.monitor_enabled')
   const maxCacheSizeRaw = form.watch(
     'performance_setting.disk_cache_max_size_mb'

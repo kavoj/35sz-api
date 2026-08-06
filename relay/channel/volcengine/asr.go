@@ -63,6 +63,7 @@ type VolcengineASRReqInfo struct {
 type asrContextData struct {
 	audioData      []byte
 	responseFormat string
+	fileMode       bool
 }
 
 // asrServerResponse is the SeedASR response payload. The transcription text is
@@ -132,8 +133,17 @@ func parseASRMultipartForm(c *gin.Context) (*asrContextData, error) {
 	defer form.RemoveAll()
 
 	responseFormat := ""
+	fileMode := false
 	if vals, ok := form.Value["response_format"]; ok && len(vals) > 0 {
 		responseFormat = vals[0]
+	}
+	if vals, ok := form.Value["metadata"]; ok && len(vals) > 0 {
+		var metadata struct {
+			Mode string `json:"mode"`
+		}
+		if common.Unmarshal([]byte(vals[0]), &metadata) == nil && metadata.Mode == "file" {
+			fileMode = true
+		}
 	}
 	if responseFormat == "" {
 		responseFormat = "json"
@@ -158,6 +168,7 @@ func parseASRMultipartForm(c *gin.Context) (*asrContextData, error) {
 			return &asrContextData{
 				audioData:      []byte(vals[0]),
 				responseFormat: responseFormat,
+				fileMode:       fileMode,
 			}, nil
 		}
 		return nil, errors.New("no audio file found in multipart form (expected 'file' or 'audio' field)")
@@ -172,6 +183,7 @@ func parseASRMultipartForm(c *gin.Context) (*asrContextData, error) {
 	return &asrContextData{
 		audioData:      audioData,
 		responseFormat: responseFormat,
+		fileMode:       fileMode,
 	}, nil
 }
 
