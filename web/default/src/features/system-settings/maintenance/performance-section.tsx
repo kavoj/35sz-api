@@ -80,6 +80,15 @@ const perfSchema = z.object({
     monitor_cpu_threshold: z.coerce.number().min(0),
     monitor_memory_threshold: z.coerce.number().min(0).max(100),
     monitor_disk_threshold: z.coerce.number().min(0).max(100),
+    tos_enabled: z.boolean(),
+    tos_endpoint: z.string(),
+    tos_region: z.string(),
+    tos_bucket: z.string(),
+    tos_access_key: z.string(),
+    tos_secret_key: z.string(),
+    tos_key_prefix: z.string(),
+    tos_url_expire_seconds: z.coerce.number().min(1).max(604800),
+    tos_public_base_url: z.string(),
   }),
 })
 
@@ -95,6 +104,15 @@ type FlatPerfDefaults = {
   'performance_setting.monitor_cpu_threshold': number
   'performance_setting.monitor_memory_threshold': number
   'performance_setting.monitor_disk_threshold': number
+  'performance_setting.tos_enabled': boolean
+  'performance_setting.tos_endpoint': string
+  'performance_setting.tos_region': string
+  'performance_setting.tos_bucket': string
+  'performance_setting.tos_access_key': string
+  'performance_setting.tos_secret_key': string
+  'performance_setting.tos_key_prefix': string
+  'performance_setting.tos_url_expire_seconds': number
+  'performance_setting.tos_public_base_url': string
 }
 
 const buildFormDefaults = (defaults: FlatPerfDefaults): PerfFormInput => ({
@@ -110,8 +128,16 @@ const buildFormDefaults = (defaults: FlatPerfDefaults): PerfFormInput => ({
       defaults['performance_setting.monitor_cpu_threshold'],
     monitor_memory_threshold:
       defaults['performance_setting.monitor_memory_threshold'],
-    monitor_disk_threshold:
-      defaults['performance_setting.monitor_disk_threshold'],
+    monitor_disk_threshold: defaults['performance_setting.monitor_disk_threshold'],
+    tos_enabled: defaults['performance_setting.tos_enabled'],
+    tos_endpoint: defaults['performance_setting.tos_endpoint'],
+    tos_region: defaults['performance_setting.tos_region'],
+    tos_bucket: defaults['performance_setting.tos_bucket'],
+    tos_access_key: defaults['performance_setting.tos_access_key'],
+    tos_secret_key: defaults['performance_setting.tos_secret_key'],
+    tos_key_prefix: defaults['performance_setting.tos_key_prefix'],
+    tos_url_expire_seconds: defaults['performance_setting.tos_url_expire_seconds'],
+    tos_public_base_url: defaults['performance_setting.tos_public_base_url'],
   },
 })
 
@@ -132,6 +158,17 @@ const normalizeFormValues = (values: PerfFormValues): FlatPerfDefaults => ({
     values.performance_setting.monitor_memory_threshold,
   'performance_setting.monitor_disk_threshold':
     values.performance_setting.monitor_disk_threshold,
+  'performance_setting.tos_enabled': values.performance_setting.tos_enabled,
+  'performance_setting.tos_endpoint': values.performance_setting.tos_endpoint,
+  'performance_setting.tos_region': values.performance_setting.tos_region,
+  'performance_setting.tos_bucket': values.performance_setting.tos_bucket,
+  'performance_setting.tos_access_key': values.performance_setting.tos_access_key,
+  'performance_setting.tos_secret_key': values.performance_setting.tos_secret_key,
+  'performance_setting.tos_key_prefix': values.performance_setting.tos_key_prefix,
+  'performance_setting.tos_url_expire_seconds':
+    values.performance_setting.tos_url_expire_seconds,
+  'performance_setting.tos_public_base_url':
+    values.performance_setting.tos_public_base_url,
 })
 
 function formatBytes(bytes: number, decimals = 2): string {
@@ -285,7 +322,17 @@ export function PerformanceSection(props: Props) {
     }
   }
 
-  const diskEnabled = form.watch('performance_setting.disk_cache_enabled')
+  const tosEnabled = form.watch('performance_setting.tos_enabled')
+  const tosTest = async () => {
+    try {
+      const res = await api.post('/api/performance/tos/test')
+      if (res.data.success) toast.success(t('TOS connection test passed'))
+      else toast.error(res.data.message || t('TOS connection test failed'))
+    } catch {
+      toast.error(t('TOS connection test failed'))
+    }
+  }
+
   const monitorEnabled = form.watch('performance_setting.monitor_enabled')
   const maxCacheSizeRaw = form.watch(
     'performance_setting.disk_cache_max_size_mb'
@@ -436,7 +483,54 @@ export function PerformanceSection(props: Props) {
 
           <Separator />
 
-          {/* System Performance Monitor */}
+          <div>
+            <div className='flex items-center justify-between gap-3'>
+              <div>
+                <h4 className='font-medium'>{t('Volcengine TOS Object Storage')}</h4>
+                <p className='text-muted-foreground mt-1 text-xs'>
+                  {t('Stores temporary recording-ASR audio files and generates short-lived URLs for Volcengine.')}
+                </p>
+              </div>
+              <Button type='button' variant='outline' size='sm' onClick={tosTest} disabled={!tosEnabled}>
+                {t('Test TOS connection')}
+              </Button>
+            </div>
+          </div>
+
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+            <FormField control={form.control} name='performance_setting.tos_enabled' render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent><FormLabel>{t('Enable Volcengine TOS')}</FormLabel></SettingsSwitchContent>
+                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              </SettingsSwitchItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_endpoint' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Endpoint')}</FormLabel><FormControl><Input placeholder='https://tos-cn-beijing.volces.com' {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_region' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Region')}</FormLabel><FormControl><Input placeholder='cn-beijing' {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_bucket' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Bucket')}</FormLabel><FormControl><Input {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_access_key' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Access Key')}</FormLabel><FormControl><Input {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_secret_key' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Secret Key')}</FormLabel><FormControl><Input type='password' autoComplete='new-password' {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_key_prefix' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Object Prefix')}</FormLabel><FormControl><Input {...field} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_url_expire_seconds' render={({ field }) => (
+              <FormItem><FormLabel>{t('Signed URL Expiry (seconds)')}</FormLabel><FormControl><Input type='number' min={1} max={604800} {...safeNumberFieldProps(field)} disabled={!tosEnabled} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name='performance_setting.tos_public_base_url' render={({ field }) => (
+              <FormItem><FormLabel>{t('TOS Public Base URL (optional)')}</FormLabel><FormControl><Input {...field} disabled={!tosEnabled} /></FormControl><FormDescription>{t('Leave empty to use a private presigned URL')}</FormDescription><FormMessage /></FormItem>
+            )} />
+          </div>
+
+
           <div>
             <h4 className='font-medium'>
               {t('System Performance Monitoring')}

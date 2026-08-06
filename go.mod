@@ -85,6 +85,7 @@ require (
 	github.com/smartwalle/ncrypto v1.0.4 // indirect
 	github.com/smartwalle/ngx v1.1.0 // indirect
 	github.com/smartwalle/nsign v1.0.9 // indirect
+	github.com/volcengine/ve-tos-golang-sdk/v2 v2.9.8 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 )
