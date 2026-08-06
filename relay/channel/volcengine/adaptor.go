@@ -2,6 +2,7 @@ package volcengine
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,6 +73,9 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 			return nil, fmt.Errorf("failed to parse ASR multipart form: %w", err)
 		}
 		c.Set(contextKeyASRData, asrData)
+		if asrData.fileMode {
+			c.Set("volcengine_file_asr", true)
+		}
 
 		// Parse request metadata for ASR endpoint selection
 		// ("bigmodel_async" default, "bigmodel_nostream" for unidirectional)
@@ -405,6 +409,11 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 	// Audio (TTS & ASR) may use WebSocket — ConvertAudioRequest sets
 	// IsStream = true for WebSocket-capable channels. In that case
 	// DoResponse handles the full lifecycle; skip the HTTP call.
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		if fileMode, _ := c.Get("volcengine_file_asr"); fileMode == true {
+			return nil, nil
+		}
+	}
 	if (info.RelayMode == constant.RelayModeAudioSpeech || info.RelayMode == constant.RelayModeAudioTranscription) && info.IsStream {
 		return nil, nil
 	}
@@ -462,7 +471,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	}
 
 	if info.RelayMode == constant.RelayModeAudioTranscription {
-		if info.IsStream {
+		fileMode, _ := c.Get("volcengine_file_asr")
+		if info.IsStream || fileMode == true {
 			asrDataInterface, exists := c.Get(contextKeyASRData)
 			if !exists {
 				return nil, types.NewErrorWithStatusCode(
@@ -479,6 +489,16 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 					types.ErrorCodeBadRequestBody,
 					http.StatusInternalServerError,
 				)
+			}
+
+			if asrData.fileMode {
+				fileCtx, cancel := context.WithTimeout(c.Request.Context(), fileASRDefaultTimeout)
+				defer cancel()
+				result, fileErr := transcribeFileWithTOS(fileCtx, c, info.OriginModelName, info.ApiKey, asrData)
+				if fileErr != nil {
+					return nil, types.NewErrorWithStatusCode(fileErr, types.ErrorCodeBadResponse, http.StatusBadGateway)
+				}
+				return writeFileASRResponse(c, result, asrData.responseFormat)
 			}
 
 			// Select ASR WebSocket endpoint from context metadata.

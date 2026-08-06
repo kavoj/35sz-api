@@ -83,6 +83,11 @@ func ValidateConfig(config Config) error {
 	return nil
 }
 
+func (s *TOS) Check(ctx context.Context) error {
+	_, err := s.client.HeadBucket(ctx, &tos.HeadBucketInput{Bucket: s.config.Bucket})
+	return err
+}
+
 func (s *TOS) Config() Config { return s.config }
 
 func (s *TOS) Put(ctx context.Context, key string, content io.Reader, contentLength int64, contentType string) error {

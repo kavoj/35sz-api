@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -121,6 +122,14 @@ func GetOptions(c *gin.Context) {
 type OptionUpdateRequest struct {
 	Key   string `json:"key"`
 	Value any    `json:"value"`
+	Clear bool   `json:"clear"`
+}
+
+func preserveSensitiveOptionValue(option OptionUpdateRequest, value string) string {
+	if option.Key != "performance_setting.tos_secret_key" || option.Clear || strings.TrimSpace(value) != "" {
+		return value
+	}
+	return performance_setting.GetTOSConfig().SecretKey
 }
 
 func UpdateOption(c *gin.Context) {
@@ -143,6 +152,7 @@ func UpdateOption(c *gin.Context) {
 	default:
 		option.Value = fmt.Sprintf("%v", option.Value)
 	}
+	option.Value = preserveSensitiveOptionValue(option, option.Value.(string))
 	switch option.Key {
 	case "QuotaForInviter", "QuotaForInvitee":
 		if isPositiveOptionValue(option.Value.(string)) && !operation_setting.IsPaymentComplianceConfirmed() {
