@@ -2,6 +2,7 @@ package performance_setting
 
 import (
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/common/objectstorage"
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
@@ -24,6 +25,17 @@ type PerformanceSetting struct {
 	MonitorMemoryThreshold int `json:"monitor_memory_threshold"`
 	// MonitorDiskThreshold 磁盘使用率阈值（%）
 	MonitorDiskThreshold int `json:"monitor_disk_threshold"`
+
+	// TOS temporary object storage for recording-ASR audio URLs.
+	TOSEnabled          bool   `json:"tos_enabled"`
+	TOSEndpoint         string `json:"tos_endpoint"`
+	TOSRegion           string `json:"tos_region"`
+	TOSBucket           string `json:"tos_bucket"`
+	TOSAccessKey        string `json:"tos_access_key"`
+	TOSSecretKey        string `json:"tos_secret_key"`
+	TOSKeyPrefix        string `json:"tos_key_prefix"`
+	TOSURLExpireSeconds int64  `json:"tos_url_expire_seconds"`
+	TOSPublicBaseURL    string `json:"tos_public_base_url"`
 }
 
 // 默认配置
@@ -37,6 +49,7 @@ var performanceSetting = PerformanceSetting{
 	MonitorCPUThreshold:    90,
 	MonitorMemoryThreshold: 90,
 	MonitorDiskThreshold:   95,
+	TOSURLExpireSeconds:    objectstorage.DefaultURLExpireSeconds,
 }
 
 func init() {
@@ -72,6 +85,20 @@ func GetPerformanceSetting() *PerformanceSetting {
 // 当配置从数据库加载后，需要调用此函数同步
 func UpdateAndSync() {
 	syncToCommon()
+}
+
+func GetTOSConfig() objectstorage.Config {
+	return objectstorage.Config{
+		Enabled:          performanceSetting.TOSEnabled,
+		Endpoint:         performanceSetting.TOSEndpoint,
+		Region:           performanceSetting.TOSRegion,
+		Bucket:           performanceSetting.TOSBucket,
+		AccessKey:        performanceSetting.TOSAccessKey,
+		SecretKey:        performanceSetting.TOSSecretKey,
+		KeyPrefix:        performanceSetting.TOSKeyPrefix,
+		URLExpireSeconds: performanceSetting.TOSURLExpireSeconds,
+		PublicBaseURL:    performanceSetting.TOSPublicBaseURL,
+	}
 }
 
 // GetCacheStats 获取缓存统计信息（代理到 common 包）

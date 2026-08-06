@@ -358,6 +358,15 @@ export type OperationsSettings = {
   'performance_setting.monitor_cpu_threshold': number
   'performance_setting.monitor_memory_threshold': number
   'performance_setting.monitor_disk_threshold': number
+  'performance_setting.tos_enabled': boolean
+  'performance_setting.tos_endpoint': string
+  'performance_setting.tos_region': string
+  'performance_setting.tos_bucket': string
+  'performance_setting.tos_access_key': string
+  'performance_setting.tos_secret_key': string
+  'performance_setting.tos_key_prefix': string
+  'performance_setting.tos_url_expire_seconds': number
+  'performance_setting.tos_public_base_url': string
   'perf_metrics_setting.enabled': boolean
   'perf_metrics_setting.flush_interval': number
   'perf_metrics_setting.bucket_time': 'hour' | 'minute' | '5min'

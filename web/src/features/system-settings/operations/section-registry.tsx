@@ -123,6 +123,24 @@ const OPERATIONS_SECTIONS = [
             settings['performance_setting.monitor_memory_threshold'] ?? 90,
           'performance_setting.monitor_disk_threshold':
             settings['performance_setting.monitor_disk_threshold'] ?? 95,
+          'performance_setting.tos_enabled':
+            settings['performance_setting.tos_enabled'] ?? false,
+          'performance_setting.tos_endpoint':
+            settings['performance_setting.tos_endpoint'] ?? '',
+          'performance_setting.tos_region':
+            settings['performance_setting.tos_region'] ?? '',
+          'performance_setting.tos_bucket':
+            settings['performance_setting.tos_bucket'] ?? '',
+          'performance_setting.tos_access_key':
+            settings['performance_setting.tos_access_key'] ?? '',
+          'performance_setting.tos_secret_key':
+            settings['performance_setting.tos_secret_key'] ?? '',
+          'performance_setting.tos_key_prefix':
+            settings['performance_setting.tos_key_prefix'] ?? 'recording-asr',
+          'performance_setting.tos_url_expire_seconds':
+            settings['performance_setting.tos_url_expire_seconds'] ?? 900,
+          'performance_setting.tos_public_base_url':
+            settings['performance_setting.tos_public_base_url'] ?? '',
         }}
       />
     ),
