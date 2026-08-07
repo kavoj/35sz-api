@@ -25,7 +25,8 @@ func TestFileASRHeadersNewAndLegacyAuth(t *testing.T) {
 
 func TestFileASRResourceID(t *testing.T) {
 	assert.Equal(t, fileASRBigModelResourceID, fileASRResourceID("volc.bigasr.auc"))
-	assert.Equal(t, asrDefaultResourceID, fileASRResourceID("doubao-seed-asr-2.0"))
+	assert.Equal(t, fileASRBigModelResourceID, fileASRResourceID("doubao-seed-asr-2.0"))
+	assert.Equal(t, fileASRBigModelResourceID, fileASRResourceID(" doubao-seed-asr-2-0 "))
 }
 
 func TestQueryFileASRTreatsEmptyBodyAsProcessing(t *testing.T) {

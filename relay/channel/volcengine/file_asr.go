@@ -69,7 +69,11 @@ type fileASRResult struct {
 }
 
 func fileASRResourceID(model string) string {
-	if strings.Contains(strings.ToLower(model), "bigasr") {
+	model = strings.ToLower(strings.TrimSpace(model))
+	// File ASR uses the BigASR resource. The public doubao SeedASR model
+	// name normally resolves to the streaming resource, but its file-mode
+	// endpoint requires volc.bigasr.auc instead.
+	if strings.Contains(model, "bigasr") || strings.Contains(model, "doubao-seed-asr-2") {
 		return fileASRBigModelResourceID
 	}
 	return asrDefaultResourceID
