@@ -1,13 +1,57 @@
 package volcengine
 
 import (
+	"bytes"
+	"mime/multipart"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/gin-gonic/gin"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParseASRMultipartDefaultsToFileMode(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "sample.wav")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("audio"))
+	require.NoError(t, err)
+	require.NoError(t, writer.WriteField("model", "doubao-seed-asr-2-0"))
+	require.NoError(t, writer.Close())
+
+	request := httptest.NewRequest("POST", "/v1/audio/transcriptions", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = request
+
+	data, err := parseASRMultipartForm(context)
+	require.NoError(t, err)
+	assert.True(t, data.fileMode)
+}
+
+func TestParseASRMultipartExplicitStreamMode(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "sample.wav")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("audio"))
+	require.NoError(t, err)
+	require.NoError(t, writer.WriteField("metadata", `{"mode":"stream"}`))
+	require.NoError(t, writer.Close())
+
+	request := httptest.NewRequest("POST", "/v1/audio/transcriptions", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = request
+
+	data, err := parseASRMultipartForm(context)
+	require.NoError(t, err)
+	assert.False(t, data.fileMode)
+}
 
 // SeedASR nests the transcription under "result", and sends no event bits on
 // responses. Parsing the OpenAI-facing text therefore depends on reading
