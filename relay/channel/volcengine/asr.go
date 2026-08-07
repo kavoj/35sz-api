@@ -133,7 +133,11 @@ func parseASRMultipartForm(c *gin.Context) (*asrContextData, error) {
 	defer form.RemoveAll()
 
 	responseFormat := ""
-	fileMode := false
+	// OpenAI audio transcriptions are file uploads by default. Keep the
+	// explicit file mode for backwards compatibility, and reserve stream mode
+	// for callers that explicitly opt in via metadata.
+	fileMode := true
+	streamMode := false
 	if vals, ok := form.Value["response_format"]; ok && len(vals) > 0 {
 		responseFormat = vals[0]
 	}
@@ -141,8 +145,9 @@ func parseASRMultipartForm(c *gin.Context) (*asrContextData, error) {
 		var metadata struct {
 			Mode string `json:"mode"`
 		}
-		if common.Unmarshal([]byte(vals[0]), &metadata) == nil && metadata.Mode == "file" {
-			fileMode = true
+		if common.Unmarshal([]byte(vals[0]), &metadata) == nil {
+			streamMode = metadata.Mode == "stream"
+			fileMode = !streamMode
 		}
 	}
 	if responseFormat == "" {

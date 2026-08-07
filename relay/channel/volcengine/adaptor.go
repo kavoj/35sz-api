@@ -95,7 +95,7 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 		if baseUrl == "" {
 			baseUrl = channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine]
 		}
-		if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl) {
+		if (baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] || isVolcengineAgentPlanBase(baseUrl)) && !asrData.fileMode {
 			info.IsStream = true
 			return bytes.NewReader(nil), nil
 		}
