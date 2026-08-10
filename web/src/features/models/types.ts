@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
 
+import type { PricingKind } from './lib/pricing-schema'
+
 // ============================================================================
 // Model Types
 // ============================================================================
@@ -43,6 +45,7 @@ export interface Model {
   endpoints?: string
   status: number
   sync_official: number
+  pricing_kind?: PricingKind
   created_time: number
   updated_time: number
   name_rule: number
@@ -238,6 +241,17 @@ export const modelFormSchema = z.object({
   name_rule: z.number().min(0).max(3).default(0),
   status: z.boolean().default(true),
   sync_official: z.boolean().default(true),
+  pricing_kind: z
+    .enum([
+      'chat',
+      'multimodal-chat',
+      'image-gen',
+      'video-gen',
+      'audio-in',
+      'audio-out',
+      'embedding',
+    ])
+    .default('chat'),
 })
 
 export type ModelFormValues = z.infer<typeof modelFormSchema>
