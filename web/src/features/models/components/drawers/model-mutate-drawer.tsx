@@ -84,6 +84,7 @@ import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
 import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
 import { modelsQueryKeys, vendorsQueryKeys, parseModelTags } from '../../lib'
+import { inferModelMetadata } from '../../lib/model-metadata-inference'
 import {
   getKindLabelKey,
   isStructuredPricingKind,
@@ -104,6 +105,7 @@ import {
   readStructuredPricing,
   updateStructuredPricingMap,
 } from '../../lib/structured-pricing-store'
+import { inferVendorName } from '../../lib/vendor-inference'
 import type { Model } from '../../types'
 import {
   AudioInPricingEditor,
@@ -296,7 +298,10 @@ export function ModelMutateDrawer({
     enabled: open,
   })
 
-  const vendors = vendorsData?.data?.items || []
+  const vendors = useMemo(
+    () => vendorsData?.data?.items ?? [],
+    [vendorsData?.data?.items]
+  )
 
   // Fetch model detail if editing
   const { data: modelData } = useQuery({
@@ -416,10 +421,53 @@ export function ModelMutateDrawer({
       audioCompletionRatio: '',
     },
   })
+  const watchedModelName = form.watch('model_name')
+  const watchedIcon = form.watch('icon')
+  const watchedVendorID = form.watch('vendor_id')
+
+  useEffect(() => {
+    if (watchedVendorID || vendors.length === 0) return
+    const inferredName = inferVendorName({
+      icon: watchedIcon,
+      modelName: watchedModelName,
+    })
+    const inferredVendor = vendors.find(
+      (vendor) => vendor.name.toLowerCase() === inferredName?.toLowerCase()
+    )
+    if (inferredVendor) {
+      form.setValue('vendor_id', inferredVendor.id, { shouldDirty: true })
+    }
+  }, [form, vendors, watchedIcon, watchedModelName, watchedVendorID])
 
   const validateNumber = (value: string) => {
     if (value === '') return true
     return !Number.isNaN(Number.parseFloat(value))
+  }
+
+  const applyInferredModelMetadata = () => {
+    const inferred = inferModelMetadata(form.getValues('model_name'))
+    if (form.getValues('tags').length === 0 && inferred.tags.length > 0) {
+      form.setValue('tags', inferred.tags, { shouldDirty: true })
+    }
+    if (!form.getValues('context_length') && inferred.contextLength) {
+      form.setValue('context_length', inferred.contextLength, {
+        shouldDirty: true,
+      })
+    }
+    if (form.getValues('pricing_kind') !== 'chat') return
+    if (inferred.tags.includes('image')) {
+      form.setValue('pricing_kind', 'image-gen', { shouldDirty: true })
+    } else if (inferred.tags.includes('video')) {
+      form.setValue('pricing_kind', 'video-gen', { shouldDirty: true })
+    } else if (inferred.tags.includes('asr')) {
+      form.setValue('pricing_kind', 'audio-in', { shouldDirty: true })
+    } else if (inferred.tags.includes('tts')) {
+      form.setValue('pricing_kind', 'audio-out', { shouldDirty: true })
+    } else if (inferred.tags.includes('embedding')) {
+      form.setValue('pricing_kind', 'embedding', { shouldDirty: true })
+    } else if (inferred.tags.includes('vision')) {
+      form.setValue('pricing_kind', 'multimodal-chat', { shouldDirty: true })
+    }
   }
 
   const loadStructuredPricing = (
@@ -892,6 +940,10 @@ export function ModelMutateDrawer({
                       <Input
                         placeholder={t('gpt-4, claude-3-opus, etc.')}
                         {...field}
+                        onBlur={() => {
+                          field.onBlur()
+                          applyInferredModelMetadata()
+                        }}
                       />
                     </FormControl>
                     <FormDescription>
