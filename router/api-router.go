@@ -232,6 +232,15 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
+		paymentConfigRoute := apiRouter.Group("/payment-config")
+		paymentConfigRoute.Use(middleware.RootAuth())
+		{
+			paymentConfigRoute.GET("/", controller.GetPaymentConfigs)
+			paymentConfigRoute.GET("/:id", controller.GetPaymentConfig)
+			paymentConfigRoute.POST("/", controller.CreatePaymentConfig)
+			paymentConfigRoute.PUT("/:id", controller.UpdatePaymentConfig)
+			paymentConfigRoute.DELETE("/:id", controller.DeletePaymentConfig)
+		}
 		registerChannelRoutes(apiRouter)
 		registerAuthzRoutes(apiRouter)
 		tokenRoute := apiRouter.Group("/token")
