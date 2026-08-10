@@ -17,31 +17,39 @@ const (
 	NameRuleSuffix
 )
 
+const (
+	ModelTypeText      = "text"
+	ModelTypeImage     = "image"
+	ModelTypeVideo     = "video"
+	ModelTypeAudio     = "audio"
+	ModelTypeEmbedding = "embedding"
+)
+
 type BoundChannel struct {
 	Name string `json:"name"`
 	Type int    `json:"type"`
 }
 
 type Model struct {
-	Id           int            `json:"id"`
-	ModelName    string         `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
-	Description  string         `json:"description,omitempty" gorm:"type:text"`
-	Icon         string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
-	Tags         string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
-	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
-	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
-	Status       int            `json:"status" gorm:"default:1"`
-	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
+	Id           int    `json:"id"`
+	ModelName    string `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
+	Description  string `json:"description,omitempty" gorm:"type:text"`
+	Icon         string `json:"icon,omitempty" gorm:"type:varchar(128)"`
+	Tags         string `json:"tags,omitempty" gorm:"type:varchar(255)"`
+	VendorID     int    `json:"vendor_id,omitempty" gorm:"index"`
+	Endpoints    string `json:"endpoints,omitempty" gorm:"type:text"`
+	Status       int    `json:"status" gorm:"default:1"`
+	SyncOfficial int    `json:"sync_official" gorm:"default:1"`
 	// PricingKind classifies the model's billing shape. See constant/pricing.go
 	// for the enum. Empty string is treated as PricingKindChat by the billing
 	// layer so legacy rows keep their existing per-token behavior. The gorm
 	// default only fires on new inserts through raw SQL — every Insert /
 	// Update path in this file normalizes the value explicitly to survive
 	// GORM's "zero-value skip" semantics.
-	PricingKind  string         `json:"pricing_kind,omitempty" gorm:"type:varchar(32);default:'chat'"`
-	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
-	UpdatedTime  int64          `json:"updated_time" gorm:"bigint"`
-	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_model_name_delete_at,priority:2"`
+	PricingKind string         `json:"pricing_kind,omitempty" gorm:"type:varchar(32);default:'chat'"`
+	CreatedTime int64          `json:"created_time" gorm:"bigint"`
+	UpdatedTime int64          `json:"updated_time" gorm:"bigint"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:uk_model_name_delete_at,priority:2"`
 
 	BoundChannels []BoundChannel `json:"bound_channels,omitempty" gorm:"-"`
 	EnableGroups  []string       `json:"enable_groups,omitempty" gorm:"-"`

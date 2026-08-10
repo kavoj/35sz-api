@@ -90,7 +90,8 @@ func TestBuildPricingBodyChatFields(t *testing.T) {
 		CompletionRatio: 4.0,
 		CacheRatio:      &cacheRatio,
 	}
-	got := buildPricingBody(src, constant.PricingKindChat, nil, nil, nil, nil)
+	got, source := buildPricingBody(src, constant.PricingKindChat, "", nil, nil, nil, nil)
+	assert.Equal(t, "user_configured", source)
 
 	// Ratios preserved verbatim.
 	assert.Equal(t, 2.5, got.ModelRatio)
@@ -118,7 +119,8 @@ func TestBuildPricingBodyChatWithZeroCompletionRatio(t *testing.T) {
 	// OutputPerMillionTokens must fall back to InputPerMillionTokens so
 	// downstream doesn't display "$0 for output" for a paid model.
 	src := model.Pricing{ModelName: "text-embedding-3-large", ModelRatio: 0.02}
-	got := buildPricingBody(src, constant.PricingKindEmbedding, nil, nil, nil, nil)
+	got, source := buildPricingBody(src, constant.PricingKindEmbedding, "", nil, nil, nil, nil)
+	assert.Equal(t, "user_configured", source)
 
 	assert.Equal(t, 0.04, got.InputPerMillionTokens)  // 0.02 × 2
 	assert.Equal(t, 0.04, got.OutputPerMillionTokens) // same fallback
@@ -133,7 +135,8 @@ func TestBuildPricingBodyImageGenFields(t *testing.T) {
 		},
 	}
 	src := model.Pricing{ModelName: "dall-e-3"}
-	got := buildPricingBody(src, constant.PricingKindImageGen, imageMap, nil, nil, nil)
+	got, source := buildPricingBody(src, constant.PricingKindImageGen, "", imageMap, nil, nil, nil)
+	assert.Equal(t, "user_configured", source)
 
 	assert.Equal(t, 0.04, got.PricePerImage)
 	assert.Equal(t, 2.0, got.QualityMultipliers["hd"])
@@ -159,7 +162,8 @@ func TestBuildPricingBodyVideoGenFields(t *testing.T) {
 		},
 	}
 	src := model.Pricing{ModelName: "doubao-seedance-2-0-260128"}
-	got := buildPricingBody(src, constant.PricingKindVideoGen, nil, videoMap, nil, nil)
+	got, source := buildPricingBody(src, constant.PricingKindVideoGen, "", nil, videoMap, nil, nil)
+	assert.Equal(t, "user_configured", source)
 
 	assert.InDelta(t, 6.301369, got.PricePerSecond, 1e-6)
 	assert.Equal(t, 1.1087, got.ResolutionMultipliers["1080p"])
@@ -180,7 +184,8 @@ func TestBuildPricingBodyAudioInFields(t *testing.T) {
 		},
 	}
 	src := model.Pricing{ModelName: "whisper-1"}
-	got := buildPricingBody(src, constant.PricingKindAudioIn, nil, nil, audioInMap, nil)
+	got, source := buildPricingBody(src, constant.PricingKindAudioIn, "", nil, nil, audioInMap, nil)
+	assert.Equal(t, "user_configured", source)
 
 	assert.Equal(t, 0.006, got.PricePerMinute)
 	assert.Zero(t, got.MinBillMinutes)
@@ -196,7 +201,8 @@ func TestBuildPricingBodyAudioOutFields(t *testing.T) {
 		},
 	}
 	src := model.Pricing{ModelName: "tts-1"}
-	got := buildPricingBody(src, constant.PricingKindAudioOut, nil, nil, nil, audioOutMap)
+	got, source := buildPricingBody(src, constant.PricingKindAudioOut, "", nil, nil, nil, audioOutMap)
+	assert.Equal(t, "user_configured", source)
 
 	assert.Equal(t, 15.0, got.PricePerMillionChars)
 	assert.Equal(t, 2.0, got.VoiceMultipliers["clone"])
@@ -221,10 +227,30 @@ func TestBuildPricingBodyFlatPriceCarriedOnEveryKind(t *testing.T) {
 		constant.PricingKindAudioOut,
 		constant.PricingKindEmbedding,
 	} {
-		got := buildPricingBody(src, kind, nil, nil, nil, nil)
+		got, source := buildPricingBody(src, kind, "", nil, nil, nil, nil)
 		assert.Equalf(t, 0.15, got.FlatPricePerRequest,
 			"FlatPricePerRequest lost for kind=%q", kind)
+		assert.Equalf(t, "user_configured", source,
+			"pricing source incorrect for kind=%q", kind)
 	}
+}
+
+func TestBuildPricingBodyUsesStaticBaseline(t *testing.T) {
+	src := model.Pricing{ModelName: "doubao-seedance-1-5-pro-251215"}
+
+	got, source := buildPricingBody(
+		src,
+		constant.PricingKindVideoGen,
+		"volcengine",
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	assert.Equal(t, "static_baseline", source)
+	assert.Greater(t, got.PricePerSecond, 0.0)
+	assert.False(t, got.PricingIncomplete)
 }
 
 func TestBuildPricingBodyMissingEntryReturnsZeroPricing(t *testing.T) {
@@ -234,11 +260,13 @@ func TestBuildPricingBodyMissingEntryReturnsZeroPricing(t *testing.T) {
 	src := model.Pricing{ModelName: "not-yet-configured"}
 	imageMap := map[string]ratio_setting.ImagePricing{} // empty
 
-	got := buildPricingBody(src, constant.PricingKindImageGen, imageMap, nil, nil, nil)
+	got, source := buildPricingBody(src, constant.PricingKindImageGen, "", imageMap, nil, nil, nil)
 
+	assert.Equal(t, "none", source)
 	assert.Zero(t, got.PricePerImage)
 	assert.Nil(t, got.QualityMultipliers)
 	assert.Nil(t, got.SizeMultipliers)
+	assert.True(t, got.PricingIncomplete)
 }
 
 func TestFirstPricingVersionEmptySlice(t *testing.T) {

@@ -225,13 +225,11 @@ func GetModelsPricing(c *gin.Context) {
 	// with the same name (edge case) resolve to whichever is last;
 	// pricing.go's metaMap has the same policy.
 	metaKindMap := make(map[string]string)
-	metaTypeMap := make(map[string]string)
 	metaVendorMap := make(map[string]int)
 	models, err := model.GetAllModels(0, 100000)
 	if err == nil {
 		for _, m := range models {
 			metaKindMap[m.ModelName] = constant.NormalizePricingKind(m.PricingKind)
-			metaTypeMap[m.ModelName] = m.ModelType
 			metaVendorMap[m.ModelName] = m.VendorID
 		}
 	}
@@ -255,10 +253,7 @@ func GetModelsPricing(c *gin.Context) {
 		if kind == "" {
 			kind = constant.PricingKindChat
 		}
-		modelType := metaTypeMap[p.ModelName]
-		if modelType == "" {
-			modelType = modelTypeForKind(kind)
-		}
+		modelType := modelTypeForKind(kind)
 
 		vendorSlug := vendorSlugByID[metaVendorMap[p.ModelName]]
 		body, source := buildPricingBody(
@@ -299,16 +294,16 @@ func firstPricingVersion(pricings []model.Pricing) string {
 // AND the pricing_source label so the handler can stamp the entry.
 //
 // Layer order:
-//   1. user_configured — admin explicitly set values via /models/metadata
-//      drawer or the model-pricing sheet. These flow into the ModelRatio /
-//      ImagePricing / VideoPricing / ... OptionMap tables that pass through
-//      as function arguments here.
-//   2. vendor_official — reserved for the PR-7e runtime override page (not
-//      wired yet). When implemented, it will consult
-//      OptionMap["VendorOfficialPricing"] before the static baseline below.
-//   3. static_baseline — compiled-in vendor catalogs under
-//      constant/vendor_official_pricing. Used when the admin hasn't
-//      configured anything and the vendor sync page hasn't overridden either.
+//  1. user_configured — admin explicitly set values via /models/metadata
+//     drawer or the model-pricing sheet. These flow into the ModelRatio /
+//     ImagePricing / VideoPricing / ... OptionMap tables that pass through
+//     as function arguments here.
+//  2. vendor_official — reserved for the PR-7e runtime override page (not
+//     wired yet). When implemented, it will consult
+//     OptionMap["VendorOfficialPricing"] before the static baseline below.
+//  3. static_baseline — compiled-in vendor catalogs under
+//     constant/vendor_official_pricing. Used when the admin hasn't
+//     configured anything and the vendor sync page hasn't overridden either.
 //
 // A "user_configured" chat-kind entry always short-circuits to that source
 // because chat models always have SOMETHING in ModelRatio even for legacy

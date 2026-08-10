@@ -1,32 +1,54 @@
-# suixingAPI five-capability baseline
+# suixingAPI capability baseline
 
 Branch base: `main` at `823e2630`.
 
-This branch integrates the five client-facing capability groups already
-available in `newpay`, without importing its payment, CNY settlement, pricing
-editor, commission, or legacy frontend-directory migrations.
+This document is the upgrade acceptance baseline. A migration is complete only
+when the applicable capability and pricing checks below pass.
 
-| Capability | Source and retained behavior | Stage verification |
+## Five model capabilities
+
+| Capability | Stable client surface | Baseline verification |
 |---|---|---|
-| Text | Latest `main` already contains DeepSeek Responses support. | `go test ./relay/channel/deepseek ./relay/common` |
-| Audio | SeedASR WebSocket for explicit stream mode; BigASR file mode defaults to TOS upload then submit/query with `volc.bigasr.auc`; Agent Plan TTS remains supported. | `go test ./relay/channel/volcengine ./common/objectstorage` |
-| Video | Volcengine native task route and Agent Plan task payload/URL adaptation. | `go test ./relay/channel/task/doubao ./controller` |
-| Embeddings | Latest `main` implementation remains intact; Volcengine URL handling includes Agent Plan embeddings. | `go test ./relay/channel/volcengine ./relay/common` |
-| Images | Latest `main` already contains the image stream disconnect and billing correction; Seedream channel testing remains image-routed. | `go test ./relay/channel/openai ./controller` |
+| Text and Responses | `/v1/chat/completions`, `/v1/responses` | relay channel and conversion tests |
+| Embeddings | `/v1/embeddings` | relay embedding tests |
+| Images | `/v1/images/*` | image adaptor and billing tests |
+| Video | task creation and polling routes | task adaptor tests |
+| Audio | `/v1/audio/speech`, `/v1/audio/transcriptions` | audio adaptor tests |
 
 ## Routing invariants
 
-- `POST /v1/audio/transcriptions` without `metadata.mode=stream` uses the
-  BigASR file-recognition workflow and `volc.bigasr.auc`.
+- Standard multipart transcription defaults to TOS upload followed by BigASR
+  submit/query and uses `volc.bigasr.auc`.
 - Only explicit `metadata.mode=stream` selects SeedASR WebSocket and
   `volc.seedasr.sauc.duration`.
-- Agent Plan base URLs use their own path layout and must not acquire a second
+- Agent Plan base URLs use their own path layout and do not acquire a second
   `/api/v3` prefix.
-- No migration in this branch changes payment, currency conversion, structured
-  pricing, commission, or `web/default` directory ownership.
+
+## Structured pricing contract
+
+- `pricing_kind` supports chat, multimodal-chat, image-gen, video-gen,
+  audio-in, audio-out, and embedding.
+- ImagePricing, VideoPricing, AudioInPricing, and AudioOutPricing are stored as
+  structured settings and explicit administrator values take precedence.
+- `GET /v1/models/pricing` exposes a stable machine-readable contract.
+- Missing structured prices are marked incomplete rather than silently billed.
+- Static reference prices are fallback data, not a replacement for explicit
+  administrator configuration.
+- Storage remains compatible with SQLite, MySQL, and PostgreSQL.
+
+## Frontend migration order
+
+1. Five-capability model management and structured pricing.
+2. Vendor inference, capability tags, and context-window metadata.
+3. Alipay, WeChat Pay, and CNY presentation.
+4. Referral commission management.
+5. Home and model-market visual upgrades.
+
+The migration targets `web/src`. Retired `web/classic` and `web/default`
+directories are not runtime or source-of-truth frontends.
 
 ## Verification boundary
 
-The repository root package embeds generated `web/dist`. Build or root-package
-tests need that frontend output first. Package-level backend verification does
-not require the generated frontend asset.
+The root Go package embeds generated `web/dist`. Root-package tests and builds
+require a completed frontend build. Tests using `httptest` listeners require an
+execution environment that permits local loopback sockets.
