@@ -35,3 +35,28 @@ func TestBuildAgentPlanVideoTestRequestUsesDocumentedFields(t *testing.T) {
 	assert.Equal(t, "text", content[0]["type"])
 	assert.NotEmpty(t, content[0]["text"])
 }
+
+func TestResolveAutomaticChannelTestPathForAliVideoModels(t *testing.T) {
+	channel := &model.Channel{Type: constant.ChannelTypeAli}
+
+	videoModels := []string{
+		"wan2.1-t2v-turbo",
+		"wan2.1-i2v-turbo",
+		"wan2.1-r2v-plus",
+		"wan2.1-kf2v-plus",
+		"wan2.1-s2v-preview",
+		"wan2.1-videoedit",
+		"happyhorse-v1",
+	}
+	for _, modelName := range videoModels {
+		t.Run(modelName, func(t *testing.T) {
+			assert.Equal(t, "/v1/video/generations", resolveAutomaticChannelTestPath(channel, modelName))
+		})
+	}
+}
+
+func TestResolveAutomaticChannelTestPathKeepsAliTextModelsOnChat(t *testing.T) {
+	channel := &model.Channel{Type: constant.ChannelTypeAli}
+
+	assert.Equal(t, "/v1/chat/completions", resolveAutomaticChannelTestPath(channel, "qwen-max"))
+}

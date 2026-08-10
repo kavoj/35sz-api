@@ -111,6 +111,47 @@ func buildAgentPlanVideoTestRequest(modelName string) map[string]interface{} {
 	}
 }
 
+func resolveAutomaticChannelTestPath(channel *model.Channel, testModel string) string {
+	requestPath := "/v1/chat/completions"
+	lowerTestModel := strings.ToLower(strings.TrimSpace(testModel))
+
+	if strings.Contains(lowerTestModel, "rerank") {
+		requestPath = "/v1/rerank"
+	}
+	if strings.Contains(lowerTestModel, "embedding") ||
+		strings.HasPrefix(lowerTestModel, "m3e") ||
+		strings.Contains(lowerTestModel, "bge-") ||
+		strings.Contains(lowerTestModel, "embed") ||
+		channel.Type == constant.ChannelTypeMokaAI {
+		requestPath = "/v1/embeddings"
+	}
+	if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(lowerTestModel, "seedream") {
+		requestPath = "/v1/images/generations"
+	}
+	if channel.Type == constant.ChannelTypeVolcEngine && isAudioTranscriptionModel(testModel) {
+		requestPath = "/v1/audio/transcriptions"
+	}
+	if channel.Type == constant.ChannelTypeAli &&
+		(strings.Contains(lowerTestModel, "happyhorse") ||
+			(strings.HasPrefix(lowerTestModel, "wan") &&
+				(strings.Contains(lowerTestModel, "t2v") ||
+					strings.Contains(lowerTestModel, "i2v") ||
+					strings.Contains(lowerTestModel, "r2v") ||
+					strings.Contains(lowerTestModel, "kf2v") ||
+					strings.Contains(lowerTestModel, "s2v") ||
+					strings.Contains(lowerTestModel, "videoedit")))) {
+		requestPath = "/v1/video/generations"
+	}
+	if strings.Contains(lowerTestModel, "codex") {
+		requestPath = "/v1/responses"
+	}
+	if strings.HasSuffix(testModel, ratio_setting.CompactModelSuffix) {
+		requestPath = "/v1/responses/compact"
+	}
+
+	return requestPath
+}
+
 // testTaskChannel 用于测试任务型渠道（如豆包视频）的 API 连通性
 func testTaskChannel(ctx context.Context, channel *model.Channel, testModel string) testResult {
 	// 对于任务型渠道，我们进行简单的 API Key 验证测试
@@ -253,40 +294,7 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			requestPath = endpointInfo.Path
 		}
 	} else {
-		// 如果没有指定端点类型，使用原有的自动检测逻辑
-
-		if strings.Contains(strings.ToLower(testModel), "rerank") {
-			requestPath = "/v1/rerank"
-		}
-
-		// 先判断是否为 Embedding 模型
-		if strings.Contains(strings.ToLower(testModel), "embedding") ||
-			strings.HasPrefix(testModel, "m3e") || // m3e 系列模型
-			strings.Contains(testModel, "bge-") || // bge 系列模型
-			strings.Contains(testModel, "embed") ||
-			channel.Type == constant.ChannelTypeMokaAI { // 其他 embedding 模型
-			requestPath = "/v1/embeddings" // 修改请求路径
-		}
-
-		// VolcEngine 图像生成模型
-		if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(testModel, "seedream") {
-			requestPath = "/v1/images/generations"
-		}
-
-		// VolcEngine ASR (SeedASR) models
-		if channel.Type == constant.ChannelTypeVolcEngine && isAudioTranscriptionModel(testModel) {
-			requestPath = "/v1/audio/transcriptions"
-		}
-
-		// responses-only models
-		if strings.Contains(strings.ToLower(testModel), "codex") {
-			requestPath = "/v1/responses"
-		}
-
-		// responses compaction models (must use /v1/responses/compact)
-		if strings.HasSuffix(testModel, ratio_setting.CompactModelSuffix) {
-			requestPath = "/v1/responses/compact"
-		}
+		requestPath = resolveAutomaticChannelTestPath(channel, testModel)
 	}
 	// Gemini 原生流式通过 URL action（:streamGenerateContent）表达而非请求体字段，
 	// GeminiChatRequest.IsStream 依据请求 URL 判定，合成请求路径需与生产入口保持一致
