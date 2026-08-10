@@ -45,6 +45,7 @@ export interface Model {
   endpoints?: string
   status: number
   sync_official: number
+  context_length?: number
   pricing_kind?: PricingKind
   created_time: number
   updated_time: number
@@ -241,6 +242,7 @@ export const modelFormSchema = z.object({
   name_rule: z.number().min(0).max(3).default(0),
   status: z.boolean().default(true),
   sync_official: z.boolean().default(true),
+  context_length: z.number().int().min(0).optional(),
   pricing_kind: z
     .enum([
       'chat',

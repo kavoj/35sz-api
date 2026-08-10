@@ -124,6 +124,7 @@ const extendedModelFormSchema = z.object({
   name_rule: z.number(),
   status: z.boolean(),
   sync_official: z.boolean(),
+  context_length: z.number().int().min(0).optional(),
   pricing_kind: z.enum(PRICING_KINDS),
   price: z.string().optional(),
   ratio: z.string().optional(),
@@ -404,6 +405,7 @@ export function ModelMutateDrawer({
       name_rule: 0,
       status: true,
       sync_official: true,
+      context_length: undefined,
       pricing_kind: 'chat',
       price: '',
       ratio: '',
@@ -504,6 +506,7 @@ export function ModelMutateDrawer({
         name_rule: model.name_rule || 0,
         status: model.status === 1,
         sync_official: model.sync_official === 1,
+        context_length: model.context_length || undefined,
         pricing_kind: normalizePricingKind(model.pricing_kind),
         ...pricing.fields,
       })
@@ -531,6 +534,7 @@ export function ModelMutateDrawer({
         name_rule: 0,
         status: true,
         sync_official: true,
+        context_length: undefined,
         pricing_kind: normalizePricingKind(currentRow?.pricing_kind),
         ...pricing.fields,
       })
@@ -992,6 +996,35 @@ export function ModelMutateDrawer({
                     </FormControl>
                     <FormDescription>
                       {t('Press Enter or comma to add tags')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='context_length'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Context window')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        min='0'
+                        placeholder='128000'
+                        step='1'
+                        type='number'
+                        value={field.value ?? ''}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          field.onChange(
+                            value === '' ? undefined : Number(value)
+                          )
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Maximum context tokens supported by this model.')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
