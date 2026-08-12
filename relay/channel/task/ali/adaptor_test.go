@@ -351,3 +351,104 @@ func TestConvertToAliRequestHappyhorseI2VResolutionEnforcement(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "720P", aliReq.Parameters.Resolution)
 }
+
+// TestConvertToAliRequestHappyhorseI2VExtractsFromMetadataContent verifies that
+// happyhorse-1.1-i2v extracts image from metadata.content[].image_url (BuildingAI format).
+func TestConvertToAliRequestHappyhorseI2VExtractsFromMetadataContent(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+
+	req := relaycommon.TaskSubmitReq{
+		Model:  "happyhorse-1.1-i2v",
+		Prompt: "generate video from reference image",
+		Metadata: map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]interface{}{
+						"url": "https://example.com/buildingai-ref.png",
+					},
+				},
+			},
+		},
+	}
+
+	aliReq, err := adaptor.convertToAliRequest(testRelayInfo(), req)
+	require.NoError(t, err)
+	require.NotNil(t, aliReq.Input.Media)
+	require.Len(t, aliReq.Input.Media, 1)
+	require.Equal(t, "first_frame", aliReq.Input.Media[0].Type)
+	require.Equal(t, "https://example.com/buildingai-ref.png", aliReq.Input.Media[0].URL)
+	require.Empty(t, aliReq.Input.ImgURL, "img_url should be cleared")
+}
+
+// TestConvertToAliRequestHappyhorseR2VExtractsFromMetadataContent verifies that
+// happyhorse-1.1-r2v extracts multiple images from metadata.content[].image_url.
+func TestConvertToAliRequestHappyhorseR2VExtractsFromMetadataContent(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+
+	req := relaycommon.TaskSubmitReq{
+		Model:  "happyhorse-1.1-r2v",
+		Prompt: "generate video from reference images",
+		Metadata: map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]interface{}{
+						"url": "https://example.com/ref1.png",
+					},
+				},
+				map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]interface{}{
+						"url": "https://example.com/ref2.png",
+					},
+				},
+			},
+		},
+	}
+
+	aliReq, err := adaptor.convertToAliRequest(testRelayInfo(), req)
+	require.NoError(t, err)
+	require.NotNil(t, aliReq.Input.Media)
+	require.Len(t, aliReq.Input.Media, 2)
+	require.Equal(t, "reference_image", aliReq.Input.Media[0].Type)
+	require.Equal(t, "https://example.com/ref1.png", aliReq.Input.Media[0].URL)
+	require.Equal(t, "reference_image", aliReq.Input.Media[1].Type)
+	require.Equal(t, "https://example.com/ref2.png", aliReq.Input.Media[1].URL)
+}
+
+// TestConvertToAliRequestHappyhorseI2VMixedSources verifies that
+// happyhorse extracts images from both standard fields and metadata.content.
+func TestConvertToAliRequestHappyhorseI2VMixedSources(t *testing.T) {
+	adaptor := &TaskAdaptor{}
+
+	req := relaycommon.TaskSubmitReq{
+		Model:  "happyhorse-1.1-r2v",
+		Prompt: "generate video",
+		Image:  "https://example.com/img1.png",
+		Images: []string{"https://example.com/img2.png"},
+		Metadata: map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]interface{}{
+						"url": "https://example.com/img3.png",
+					},
+				},
+			},
+		},
+	}
+
+	aliReq, err := adaptor.convertToAliRequest(testRelayInfo(), req)
+	require.NoError(t, err)
+	require.NotNil(t, aliReq.Input.Media)
+	require.Len(t, aliReq.Input.Media, 3)
+	require.Equal(t, "reference_image", aliReq.Input.Media[0].Type)
+	require.Equal(t, "reference_image", aliReq.Input.Media[1].Type)
+	require.Equal(t, "reference_image", aliReq.Input.Media[2].Type)
+
+	urls := []string{aliReq.Input.Media[0].URL, aliReq.Input.Media[1].URL, aliReq.Input.Media[2].URL}
+	require.Contains(t, urls, "https://example.com/img1.png")
+	require.Contains(t, urls, "https://example.com/img2.png")
+	require.Contains(t, urls, "https://example.com/img3.png")
+}

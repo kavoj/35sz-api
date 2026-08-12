@@ -341,6 +341,60 @@ func secondTaskImage(req relaycommon.TaskSubmitReq) string {
 	return ""
 }
 
+// extractImagesFromContent extracts image URLs from a content array
+// (supports both req.Content and metadata.content formats).
+func extractImagesFromContent(content []map[string]interface{}) []string {
+	var images []string
+	for _, item := range content {
+		if itemType, ok := item["type"].(string); ok && itemType == "image_url" {
+			if imageURL, ok := item["image_url"].(map[string]interface{}); ok {
+				if url, ok := imageURL["url"].(string); ok {
+					if trimmed := strings.TrimSpace(url); trimmed != "" {
+						images = append(images, trimmed)
+					}
+				}
+			}
+		}
+	}
+	return images
+}
+
+// extractImagesFromMetadataContent extracts image URLs from metadata.content
+// (BuildingAI format: metadata: {content: [{type: "image_url", image_url: {url: "..."}}]}).
+func extractImagesFromMetadataContent(metadata map[string]interface{}) []string {
+	if metadata == nil {
+		return nil
+	}
+	contentRaw, ok := metadata["content"]
+	if !ok {
+		return nil
+	}
+
+	// Handle []interface{} (when parsed from JSON)
+	contentSlice, ok := contentRaw.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var images []string
+	for _, item := range contentSlice {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if itemType, ok := itemMap["type"].(string); ok && itemType == "image_url" {
+			if imageURL, ok := itemMap["image_url"].(map[string]interface{}); ok {
+				if url, ok := imageURL["url"].(string); ok {
+					if trimmed := strings.TrimSpace(url); trimmed != "" {
+						images = append(images, trimmed)
+					}
+				}
+			}
+		}
+	}
+	return images
+}
+
 // normalizeInputMedia converts legacy image fields to the new input.media protocol
 // for models that require it (happyhorse series and wan2.7-i2v).
 //
@@ -370,17 +424,10 @@ func normalizeInputMedia(aliReq *AliVideoRequest, req relaycommon.TaskSubmitReq)
 				refImages = append(refImages, img)
 			}
 			// Extract images from req.Content (OpenAI-style image_url)
-			for _, item := range req.Content {
-				if itemType, ok := item["type"].(string); ok && itemType == "image_url" {
-					if imageURL, ok := item["image_url"].(map[string]interface{}); ok {
-						if url, ok := imageURL["url"].(string); ok {
-							if trimmed := strings.TrimSpace(url); trimmed != "" {
-								refImages = append(refImages, trimmed)
-							}
-						}
-					}
-				}
-			}
+			refImages = append(refImages, extractImagesFromContent(req.Content)...)
+			// Extract images from metadata.content (BuildingAI format)
+			refImages = append(refImages, extractImagesFromMetadataContent(req.Metadata)...)
+
 			// Deduplicate
 			refImages = lo.Uniq(refImages)
 			if len(refImages) > 9 {
@@ -394,7 +441,20 @@ func normalizeInputMedia(aliReq *AliVideoRequest, req relaycommon.TaskSubmitReq)
 			}
 		} else {
 			// i2v: first_frame + optional last_frame/driving_audio
+			// First try to get from standard fields
 			firstFrameURL := firstNonEmpty(aliReq.Input.FirstFrameURL, aliReq.Input.ImgURL, firstTaskImage(req))
+
+			// If no first frame yet, try extracting from content arrays
+			if firstFrameURL == "" {
+				contentImages := extractImagesFromContent(req.Content)
+				if len(contentImages) == 0 {
+					contentImages = extractImagesFromMetadataContent(req.Metadata)
+				}
+				if len(contentImages) > 0 {
+					firstFrameURL = contentImages[0]
+				}
+			}
+
 			lastFrameURL := firstNonEmpty(aliReq.Input.LastFrameURL, secondTaskImage(req))
 			audioURL := aliReq.Input.AudioURL
 
@@ -420,7 +480,7 @@ func normalizeInputMedia(aliReq *AliVideoRequest, req relaycommon.TaskSubmitReq)
 	}
 
 	if len(aliReq.Input.Media) == 0 {
-		return fmt.Errorf("model %s requires image, images, input_reference, content[].image_url, or input.media", aliReq.Model)
+		return fmt.Errorf("model %s requires image, images, input_reference, content[].image_url, metadata.content[].image_url, or input.media", aliReq.Model)
 	}
 
 	// Clear legacy fields when using the new protocol
