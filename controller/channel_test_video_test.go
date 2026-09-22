@@ -46,7 +46,9 @@ func TestResolveAutomaticChannelTestPathForAliVideoModels(t *testing.T) {
 		"wan2.1-kf2v-plus",
 		"wan2.1-s2v-preview",
 		"wan2.1-videoedit",
-		"happyhorse-v1",
+		"happyhorse-1.1-t2v",
+		"happyhorse-1.1-i2v",
+		"happyhorse-1.1-r2v",
 	}
 	for _, modelName := range videoModels {
 		t.Run(modelName, func(t *testing.T) {

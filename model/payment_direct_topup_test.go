@@ -55,3 +55,14 @@ func TestRechargeWechatRejectsAlipayOrder(t *testing.T) {
 	assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, "wechat-cross-gateway"))
 	assert.Equal(t, 0, getUserQuotaForPaymentGuardTest(t, 604))
 }
+
+func TestRechargeDirectPaymentRejectsMismatchedPaidAmount(t *testing.T) {
+	truncateTables(t)
+	insertUserForPaymentGuardTest(t, 605, 0)
+	insertTopUpForPaymentGuardTest(t, "alipay-amount-mismatch", 605, PaymentProviderAlipay)
+
+	err := RechargeAlipayPaid("alipay-amount-mismatch", 998, "127.0.0.1")
+	require.ErrorIs(t, err, ErrPaymentAmountMismatch)
+	assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, "alipay-amount-mismatch"))
+	assert.Equal(t, 0, getUserQuotaForPaymentGuardTest(t, 605))
+}

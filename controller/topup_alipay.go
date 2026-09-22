@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -113,4 +114,52 @@ func RequestAlipayAmount(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
+}
+
+func AlipayNotify(c *gin.Context) {
+	config, err := getDecryptedPaymentConfig(model.PaymentProviderAlipay)
+	if err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	client, err := service.NewAlipayPayClient(config, "/api/alipay/notify", paymentReturnPath("/wallet?show_history=true"))
+	if err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	if err := c.Request.ParseForm(); err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	params := url.Values(c.Request.Form)
+	if err := client.VerifyNotification(c.Request.Context(), params); err != nil {
+		logger.LogWarn(c.Request.Context(), "支付宝 webhook 验签失败")
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	tradeNo := params.Get("out_trade_no")
+	tradeStatus := params.Get("trade_status")
+	if tradeNo == "" {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	if tradeStatus == "TRADE_CLOSED" {
+		_ = model.UpdatePendingTopUpStatus(tradeNo, model.PaymentProviderAlipay, common.TopUpStatusFailed)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+	if tradeStatus != "TRADE_SUCCESS" && tradeStatus != "TRADE_FINISHED" {
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+	paidAmount, err := strconv.ParseFloat(params.Get("total_amount"), 64)
+	if err != nil || paidAmount <= 0 {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	if err := model.RechargeAlipayPaid(tradeNo, service.YuanToFen(paidAmount), c.ClientIP()); err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	_, _ = c.Writer.Write([]byte("success"))
 }

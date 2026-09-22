@@ -18,9 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { Resolver } from 'react-hook-form'
+import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { RefreshCw } from 'lucide-react'
 import * as z from 'zod'
 
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -40,6 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { api } from '@/lib/api'
 import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
@@ -101,11 +106,46 @@ type PricingSectionProps = {
   defaultValues: PricingFormValues
 }
 
+type LiveUsdCnyRate = {
+  rate: number
+  asOf: string
+  stale: boolean
+}
+
+async function fetchLiveUsdCnyRate(): Promise<LiveUsdCnyRate> {
+  const response = await api.get('/api/option/exchange_rate/usd_cny', {
+    disableDuplicate: true,
+  } as Record<string, unknown>)
+  const body = response.data as {
+    success?: boolean
+    message?: string
+    stale?: boolean
+    data?: { rate?: number; as_of?: string }
+  }
+  const rate = body.data?.rate
+  if (!body.success || typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error(body.message || 'Failed to fetch exchange rate')
+  }
+  return { rate, asOf: body.data?.as_of ?? '', stale: body.stale === true }
+}
+
+function useLiveUsdCnyRate() {
+  return useQuery({
+    queryKey: ['live-usd-cny-rate'],
+    queryFn: fetchLiveUsdCnyRate,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+}
+
 export function PricingSection({ defaultValues }: PricingSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
 
   const pricingSchema = createPricingSchema(t)
+  const liveUsdCnyQuery = useLiveUsdCnyRate()
 
   const { form, handleSubmit, handleReset, isDirty, isSubmitting } =
     useSettingsForm<PricingFormValues>({
@@ -229,35 +269,47 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
               )}
             />
 
+            <LiveUsdCnyReference
+              query={liveUsdCnyQuery}
+              currentValue={form.watch('USDExchangeRate')}
+              displayType={displayType}
+              onApply={(rate) =>
+                form.setValue('USDExchangeRate', rate, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            />
+
             {displayType !== 'TOKENS' && (
-              <FormField
-                control={form.control}
-                name='USDExchangeRate'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {displayType === 'CNY'
-                        ? t('CNY per USD')
-                        : displayType === 'USD'
-                          ? t('USD Exchange Rate')
+              <>
+                <FormField
+                  control={form.control}
+                  name='USDExchangeRate'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {displayType === 'CNY'
+                          ? t('CNY per USD')
                           : t('USD Exchange Rate')}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type='number'
-                        step='0.01'
-                        {...safeNumberFieldProps(field)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Real exchange rate between USD and your payment gateway currency'
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          step='0.01'
+                          {...safeNumberFieldProps(field)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Real exchange rate between USD and your payment gateway currency'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
 
             {displayType === 'CUSTOM' && (
@@ -372,5 +424,111 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
         </Form>
       </SettingsSection>
     </>
+  )
+}
+
+type LiveUsdCnyReferenceProps = {
+  query: ReturnType<typeof useLiveUsdCnyRate>
+  currentValue: number
+  displayType: 'USD' | 'CNY' | 'TOKENS' | 'CUSTOM'
+  onApply: (rate: number) => void
+}
+
+function LiveUsdCnyReference({
+  query,
+  currentValue,
+  displayType,
+  onApply,
+}: LiveUsdCnyReferenceProps) {
+  const { t } = useTranslation()
+  const { data, isFetching, isError, refetch } = query
+  const roundedRate = data ? Math.round(data.rate * 10000) / 10000 : null
+  const drift =
+    roundedRate != null && currentValue > 0
+      ? ((currentValue - roundedRate) / roundedRate) * 100
+      : null
+  const canApply =
+    roundedRate != null &&
+    displayType === 'CNY' &&
+    Math.abs(currentValue - roundedRate) > 0.0001
+
+  let status: ReactNode
+  if (isError) {
+    status = (
+      <span className='text-destructive text-xs'>
+        {t('Failed to load live rate. Check network and retry.')}
+      </span>
+    )
+  } else if (roundedRate == null) {
+    status = (
+      <span className='text-muted-foreground text-xs'>
+        {isFetching ? t('Loading…') : t('No data yet')}
+      </span>
+    )
+  } else {
+    status = (
+      <>
+        <span className='font-mono text-base font-semibold'>
+          1 USD ≈ {roundedRate.toFixed(4)} CNY
+        </span>
+        {data?.asOf && (
+          <span className='text-muted-foreground text-xs'>
+            {t('As of')} {data.asOf}
+          </span>
+        )}
+        {data?.stale && (
+          <span className='text-muted-foreground text-xs'>
+            {t('(cached, upstream unreachable)')}
+          </span>
+        )}
+        {drift != null && Math.abs(drift) >= 0.5 && (
+          <span className='text-muted-foreground text-xs'>
+            {t('Current setting deviates by')} {drift > 0 ? '+' : ''}
+            {drift.toFixed(2)}%
+          </span>
+        )}
+        {canApply && (
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            className='h-auto px-0'
+            onClick={() => onApply(roundedRate)}
+          >
+            {t('Apply to exchange rate')}
+          </Button>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <div className='border-border bg-muted/30 rounded-md border border-dashed p-3 text-sm'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='flex flex-col gap-0.5'>
+          <span className='font-medium'>
+            {t('Live USD → CNY reference rate')}
+          </span>
+          <span className='text-muted-foreground text-xs'>
+            {t(
+              'For reference only when filling in the exchange rate. Source: PBOC central parity via chinamoney.com.cn.'
+            )}
+          </span>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          onClick={() => void refetch()}
+          disabled={isFetching}
+        >
+          <RefreshCw className={isFetching ? 'animate-spin' : undefined} />
+          {t('Refresh')}
+        </Button>
+      </div>
+      <div className='mt-2 flex flex-wrap items-center gap-x-3 gap-y-1'>
+        {status}
+      </div>
+    </div>
   )
 }

@@ -12,11 +12,53 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
+	"github.com/wechatpay-apiv3/wechatpay-go/services/payments"
 )
 
 type WechatPayRequest struct {
 	Amount        int64  `json:"amount"`
 	PaymentMethod string `json:"payment_method"`
+}
+
+func WechatNotify(c *gin.Context) {
+	config, err := getDecryptedPaymentConfig(model.PaymentProviderWechat)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "config unavailable"})
+		return
+	}
+	client, err := service.NewWechatPayClient(config, "/api/wechat/notify")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "config invalid"})
+		return
+	}
+	transaction := new(payments.Transaction)
+	if _, err := client.ParseNotifyRequest(c.Request.Context(), c.Request, transaction); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "verify failed"})
+		return
+	}
+	if transaction.OutTradeNo == nil || transaction.TradeState == nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "invalid notification"})
+		return
+	}
+	tradeNo := *transaction.OutTradeNo
+	if *transaction.TradeState == "CLOSED" || *transaction.TradeState == "PAYERROR" {
+		_ = model.UpdatePendingTopUpStatus(tradeNo, model.PaymentProviderWechat, common.TopUpStatusFailed)
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
+		return
+	}
+	if *transaction.TradeState != "SUCCESS" {
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
+		return
+	}
+	if transaction.Amount == nil || transaction.Amount.Total == nil || *transaction.Amount.Total <= 0 {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "invalid amount"})
+		return
+	}
+	if err := model.RechargeWechatPaid(tradeNo, *transaction.Amount.Total, c.ClientIP()); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "recharge failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
 }
 
 func RequestWechatPay(c *gin.Context) {

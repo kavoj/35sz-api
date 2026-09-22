@@ -368,6 +368,28 @@ export function getCurrencyDisplay() {
   return { config, meta }
 }
 
+export function convertBillingDisplayToUSD(
+  amountDisplay: number | null | undefined
+): number {
+  if (amountDisplay == null || Number.isNaN(amountDisplay)) return Number.NaN
+  const { config } = getCurrencyDisplay()
+  const meta = getBillingDisplayMeta(config)
+  if (meta.kind === 'tokens') return amountDisplay
+  if (!meta.exchangeRate || meta.exchangeRate <= 0) return amountDisplay
+  return amountDisplay / meta.exchangeRate
+}
+
+export function convertUSDToBillingDisplay(
+  amountUSD: number | null | undefined
+): number {
+  if (amountUSD == null || Number.isNaN(amountUSD)) return Number.NaN
+  const { config } = getCurrencyDisplay()
+  const meta = getBillingDisplayMeta(config)
+  if (meta.kind === 'tokens') return amountUSD
+  if (!meta.exchangeRate || meta.exchangeRate <= 0) return amountUSD
+  return amountUSD * meta.exchangeRate
+}
+
 /**
  * Format a USD amount according to the admin-configured display settings.
  *

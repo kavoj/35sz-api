@@ -3,9 +3,26 @@ package controller
 import (
 	"strings"
 
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
+
+func isAlipayWebhookEnabled() bool {
+	return isAlipayTopUpEnabled()
+}
+
+func isWechatTopUpEnabled() bool {
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	_, err := model.GetEnabledPaymentConfigByProvider(model.PaymentProviderWechat)
+	return err == nil
+}
+
+func isWechatWebhookEnabled() bool {
+	return isWechatTopUpEnabled()
+}
 
 func isPaymentComplianceConfirmed() bool {
 	return operation_setting.IsPaymentComplianceConfirmed()

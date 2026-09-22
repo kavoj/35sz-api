@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -86,4 +87,46 @@ func SubscriptionRequestAlipayPay(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": gin.H{"pay_url": payURL, "trade_no": tradeNo}})
+}
+
+func SubscriptionAlipayNotify(c *gin.Context) {
+	config, err := getDecryptedPaymentConfig(model.PaymentProviderAlipay)
+	if err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	client, err := service.NewAlipayPayClient(config, "/api/subscription/alipay/notify", paymentReturnPath("/wallet?show_history=true"))
+	if err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	if err := c.Request.ParseForm(); err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	params := url.Values(c.Request.Form)
+	if err := client.VerifyNotification(c.Request.Context(), params); err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	tradeNo := params.Get("out_trade_no")
+	tradeStatus := params.Get("trade_status")
+	if tradeNo == "" {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	if tradeStatus == "TRADE_CLOSED" {
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderAlipay)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+	if tradeStatus != "TRADE_SUCCESS" && tradeStatus != "TRADE_FINISHED" {
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+	if err := model.CompleteSubscriptionOrder(tradeNo, common.GetJsonString(params), model.PaymentProviderAlipay, ""); err != nil {
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	_, _ = c.Writer.Write([]byte("success"))
 }

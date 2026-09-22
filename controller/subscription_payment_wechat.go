@@ -10,11 +10,49 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/thanhpk/randstr"
+	"github.com/wechatpay-apiv3/wechatpay-go/services/payments"
 )
 
 type SubscriptionWechatPayRequest struct {
 	PlanID        int    `json:"plan_id"`
 	PaymentMethod string `json:"payment_method"`
+}
+
+func SubscriptionWechatNotify(c *gin.Context) {
+	config, err := getDecryptedPaymentConfig(model.PaymentProviderWechat)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "config unavailable"})
+		return
+	}
+	client, err := service.NewWechatPayClient(config, "/api/subscription/wechat/notify")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "config invalid"})
+		return
+	}
+	transaction := new(payments.Transaction)
+	if _, err := client.ParseNotifyRequest(c.Request.Context(), c.Request, transaction); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "verify failed"})
+		return
+	}
+	if transaction.OutTradeNo == nil || transaction.TradeState == nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "invalid notification"})
+		return
+	}
+	tradeNo := *transaction.OutTradeNo
+	if *transaction.TradeState == "CLOSED" || *transaction.TradeState == "PAYERROR" {
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderWechat)
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
+		return
+	}
+	if *transaction.TradeState != "SUCCESS" {
+		c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
+		return
+	}
+	if err := model.CompleteSubscriptionOrder(tradeNo, common.GetJsonString(transaction), model.PaymentProviderWechat, ""); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": "FAIL", "message": "complete failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": "SUCCESS", "message": "成功"})
 }
 
 func SubscriptionRequestWechatPay(c *gin.Context) {

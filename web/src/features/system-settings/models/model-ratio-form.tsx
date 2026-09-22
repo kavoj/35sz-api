@@ -18,12 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { Code2, Eye, RotateCcw, Save } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import type { UseFormReturn } from 'react-hook-form'
+import { memo, useCallback, useMemo, useState } from 'react'
+import { type UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { JsonCodeEditor } from '@/components/json-code-editor'
-import { LearnMore } from '@/components/learn-more'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -35,20 +34,15 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
-import { getEnabledModels } from '@/features/channels/api'
-import { handleServerError } from '@/lib/handle-server-error'
-import { requireServerSuccess } from '@/lib/server-error-message'
+import { getModels } from '@/features/models/api'
+import { modelsQueryKeys } from '@/features/models/lib'
 
 import {
   SettingsForm,
   SettingsSwitchContent,
   SettingsSwitchItem,
 } from '../components/settings-form-layout'
-import { SettingsPageActionsPortal } from '../components/settings-page-context'
-import {
-  ModelRatioVisualEditor,
-  type ModelRatioVisualEditorHandle,
-} from './model-ratio-visual-editor'
+import { ModelRatioVisualEditor } from './model-ratio-visual-editor'
 
 type ModelFormValues = {
   ModelPrice: string
@@ -62,7 +56,10 @@ type ModelFormValues = {
   ExposeRatioEnabled: boolean
   BillingMode: string
   BillingExpr: string
-  PluginBillingExpr: string
+  ImagePricing: string
+  VideoPricing: string
+  AudioInPricing: string
+  AudioOutPricing: string
 }
 
 type ModelRatioFormProps = {
@@ -84,6 +81,10 @@ type ModelJsonFieldName =
   | 'ImageRatio'
   | 'AudioRatio'
   | 'AudioCompletionRatio'
+  | 'ImagePricing'
+  | 'VideoPricing'
+  | 'AudioInPricing'
+  | 'AudioOutPricing'
 
 const modelJsonFields: Array<{
   name: ModelJsonFieldName
@@ -134,6 +135,30 @@ const modelJsonFields: Array<{
     labelKey: 'Audio completion ratio',
     descriptionKey: 'Ratio applied to audio completions for streaming models.',
   },
+  {
+    name: 'ImagePricing',
+    labelKey: 'Image generation pricing',
+    descriptionKey:
+      'Structured pricing for image generation models (per-image base + multipliers).',
+  },
+  {
+    name: 'VideoPricing',
+    labelKey: 'Video generation pricing',
+    descriptionKey:
+      'Structured pricing for video generation models (per-second base + multipliers).',
+  },
+  {
+    name: 'AudioInPricing',
+    labelKey: 'Audio input pricing',
+    descriptionKey:
+      'Structured pricing for speech recognition models (per-minute base).',
+  },
+  {
+    name: 'AudioOutPricing',
+    labelKey: 'Audio output pricing',
+    descriptionKey:
+      'Structured pricing for text-to-speech models (per-1M-chars base + multipliers).',
+  },
 ]
 
 function ModelJsonTextareaField(props: {
@@ -153,9 +178,6 @@ function ModelJsonTextareaField(props: {
             <JsonCodeEditor
               value={field.value}
               onChange={(value) => field.onChange(value)}
-              name={field.name}
-              onBlur={field.onBlur}
-              textareaRef={field.ref}
             />
           </FormControl>
           <FormDescription className='text-xs leading-5'>
@@ -170,7 +192,6 @@ function ModelJsonTextareaField(props: {
 
 export const ModelRatioForm = memo(function ModelRatioForm({
   form,
-  savedValues,
   onSave,
   onReset,
   isSaving,
@@ -178,36 +199,50 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   variant = 'default',
 }: ModelRatioFormProps) {
   const { t } = useTranslation()
-  const isUnsetVariant = variant === 'unset'
   const [editMode, setEditMode] = useState<'visual' | 'json'>('visual')
-  const visualEditorRef = useRef<ModelRatioVisualEditorHandle>(null)
 
-  const enabledModelsQuery = useQuery({
-    queryKey: ['enabled-models'],
-    queryFn: async () => requireServerSuccess(await getEnabledModels()),
-    enabled: isUnsetVariant,
+  // "Added only" toggle — default true so admins see just the models they've
+  // registered in the model catalogue. Toggling off reveals every OptionMap
+  // pricing key (including legacy models the admin removed from the catalogue
+  // but hasn't cleared from pricing). State persists in localStorage so the
+  // preference survives navigation.
+  const ADDED_ONLY_STORAGE_KEY = 'model-ratio-filter-added-only'
+  const [showAddedOnly, setShowAddedOnly] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(ADDED_ONLY_STORAGE_KEY)
+      return raw === null ? true : raw === 'true'
+    } catch {
+      return true
+    }
   })
+  const isUnsetVariant = variant === 'unset'
+  const handleToggleAddedOnly = useCallback((next: boolean) => {
+    setShowAddedOnly(next)
+    try {
+      localStorage.setItem(ADDED_ONLY_STORAGE_KEY, String(next))
+    } catch {
+      /* localStorage unavailable — ignore */
+    }
+  }, [])
 
-  const enabledModelsError = isUnsetVariant
-    ? enabledModelsQuery.isError ||
-      (enabledModelsQuery.data !== undefined &&
-        !enabledModelsQuery.data.success)
-    : false
-  const enabledModelsErrorMessage = enabledModelsQuery.data?.message
-
-  useEffect(() => {
-    if (!enabledModelsError) return
-    handleServerError(
-      enabledModelsQuery.error ?? enabledModelsQuery.data,
-      t('Failed to load enabled models')
-    )
-  }, [
-    enabledModelsError,
-    enabledModelsErrorMessage,
-    enabledModelsQuery.error,
-    enabledModelsQuery.data,
-    t,
-  ])
+  // Fetch the registered models set for the filter. `page_size: 10000` is the
+  // convention used by other admin screens (e.g. model-mutate-drawer) to grab
+  // the full catalogue in one round-trip; the API caps at a large enough
+  // number that pagination isn't a concern for the 100-500 model range this
+  // deployment sees. `enabled: showAddedOnly` skips the request when the
+  // filter is off, so the toggle is truly zero-cost when disabled.
+  const { data: registeredModelsData } = useQuery({
+    queryKey: modelsQueryKeys.list({ page_size: 10000 }),
+    queryFn: () => getModels({ page_size: 10000 }),
+    enabled: showAddedOnly || isUnsetVariant,
+    staleTime: 60_000,
+  })
+  const registeredModelNames = useMemo(() => {
+    if (!registeredModelsData?.data?.items) return undefined
+    return new Set(
+      registeredModelsData.data.items.map((m) => m.model_name),
+    ) as ReadonlySet<string>
+  }, [registeredModelsData])
 
   const handleFieldChange = useCallback(
     (field: keyof ModelFormValues, value: string) => {
@@ -224,100 +259,66 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   }, [])
 
   const handleSave = useCallback(async () => {
-    if (editMode === 'visual') {
-      const committed = await visualEditorRef.current?.commitOpenEditor()
-      if (committed === false) return
-    }
-
     await form.handleSubmit(onSave)()
-  }, [editMode, form, onSave])
+  }, [form, onSave])
 
   return (
-    <Form {...form}>
-      <div className='flex min-h-0 flex-1 flex-col gap-6'>
-        {!isUnsetVariant && (
-          <div className='flex shrink-0 flex-wrap items-center justify-end gap-2'>
-            <SettingsPageActionsPortal>
-              <FormField
-                control={form.control}
-                name='ExposeRatioEnabled'
-                render={({ field }) => (
-                  <SettingsSwitchItem className='gap-2 py-0'>
-                    <SettingsSwitchContent>
-                      <FormLabel>{t('Expose ratio API')}</FormLabel>
-                      <FormDescription className='sr-only'>
-                        {t(
-                          'Allow clients to query configured prices via `/api/ratio`.'
-                        )}
-                      </FormDescription>
-                    </SettingsSwitchContent>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <LearnMore contentProps={{ side: 'bottom', align: 'end' }}>
-                      {t(
-                        'Allow clients to query configured prices via `/api/ratio`.'
-                      )}
-                    </LearnMore>
-                  </SettingsSwitchItem>
-                )}
-              />
-            </SettingsPageActionsPortal>
-            <Button
-              type='button'
-              variant='destructive'
-              size='sm'
-              onClick={onReset}
-              disabled={isResetting}
-            >
-              <RotateCcw data-icon='inline-start' />
-              {t('Reset prices')}
-            </Button>
-            {editMode === 'json' && (
-              <Button
-                type='button'
-                size='sm'
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                <Save data-icon='inline-start' />
-                {isSaving ? t('Saving...') : t('Save model prices')}
-              </Button>
-            )}
-            <Button variant='outline' size='sm' onClick={toggleEditMode}>
-              {editMode === 'visual' ? (
-                <>
-                  <Code2 className='mr-2 h-4 w-4' />
-                  {t('Switch to JSON')}
-                </>
-              ) : (
-                <>
-                  <Eye className='mr-2 h-4 w-4' />
-                  {t('Switch to Visual')}
-                </>
-              )}
-            </Button>
-          </div>
+    <div className='space-y-6'>
+      <div className='flex flex-wrap items-center justify-end gap-3'>
+        {/* Added-only filter toggle. Placed on the left of the toolbar so
+          * admins scanning left-to-right see the filter state before the
+          * destructive Reset action. Hidden in JSON edit mode because the
+          * JSON editor already shows the raw OptionMap and can't render a
+          * filtered view. */}
+        {editMode === 'visual' && (
+          <label className='mr-auto flex items-center gap-2 text-sm text-muted-foreground'>
+            <Switch
+              checked={showAddedOnly}
+              onCheckedChange={handleToggleAddedOnly}
+            />
+            <span>{t('Show only registered models')}</span>
+          </label>
         )}
+        <Button
+          type='button'
+          variant='destructive'
+          size='sm'
+          onClick={onReset}
+          disabled={isResetting}
+        >
+          <RotateCcw data-icon='inline-start' />
+          {t('Reset prices')}
+        </Button>
+        {editMode === 'json' && (
+          <Button
+            type='button'
+            size='sm'
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            <Save data-icon='inline-start' />
+            {isSaving ? t('Saving...') : t('Save model prices')}
+          </Button>
+        )}
+        <Button variant='outline' size='sm' onClick={toggleEditMode}>
+          {editMode === 'visual' ? (
+            <>
+              <Code2 className='mr-2 h-4 w-4' />
+              {t('Switch to JSON')}
+            </>
+          ) : (
+            <>
+              <Eye className='mr-2 h-4 w-4' />
+              {t('Switch to Visual')}
+            </>
+          )}
+        </Button>
+      </div>
 
+      <Form {...form}>
         {editMode === 'visual' ? (
-          <div className='flex min-h-0 flex-1 flex-col gap-6'>
+          <div className='space-y-6'>
             <ModelRatioVisualEditor
-              ref={visualEditorRef}
-              savedModelPrice={savedValues.ModelPrice}
-              savedModelRatio={savedValues.ModelRatio}
-              savedCacheRatio={savedValues.CacheRatio}
-              savedCreateCacheRatio={savedValues.CreateCacheRatio}
-              savedCompletionRatio={savedValues.CompletionRatio}
-              savedImageRatio={savedValues.ImageRatio}
-              savedAudioRatio={savedValues.AudioRatio}
-              savedAudioCompletionRatio={savedValues.AudioCompletionRatio}
-              savedBillingMode={savedValues.BillingMode}
-              savedBillingExpr={savedValues.BillingExpr}
-              savedPluginBillingExpr={savedValues.PluginBillingExpr}
               modelPrice={form.watch('ModelPrice')}
               modelRatio={form.watch('ModelRatio')}
               cacheRatio={form.watch('CacheRatio')}
@@ -326,28 +327,47 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               imageRatio={form.watch('ImageRatio')}
               audioRatio={form.watch('AudioRatio')}
               audioCompletionRatio={form.watch('AudioCompletionRatio')}
+              imagePricing={form.watch('ImagePricing')}
+              videoPricing={form.watch('VideoPricing')}
+              audioInPricing={form.watch('AudioInPricing')}
+              audioOutPricing={form.watch('AudioOutPricing')}
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
-              pluginBillingExpr={form.watch('PluginBillingExpr')}
-              candidateModelNames={
-                isUnsetVariant ? enabledModelsQuery.data?.data : undefined
-              }
-              candidateModelsLoading={
-                isUnsetVariant && enabledModelsQuery.isLoading
-              }
-              filterMode={isUnsetVariant ? 'unset' : 'all'}
-              onSave={handleSave}
-              isSaving={isSaving}
+              filterAddedOnly={showAddedOnly}
+              registeredModelNames={registeredModelNames}
+              onApply={handleSave}
               onChange={(field, value) => {
                 const fieldMap: Record<string, keyof ModelFormValues> = {
                   'billing_setting.billing_mode': 'BillingMode',
                   'billing_setting.billing_expr': 'BillingExpr',
-                  'billing_setting.plugin_billing_expr': 'PluginBillingExpr',
                 }
                 const formField =
                   fieldMap[field] || (field as keyof ModelFormValues)
                 handleFieldChange(formField, value)
               }}
+            />
+
+            <FormField
+              control={form.control}
+              name='ExposeRatioEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Expose ratio API')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Allow clients to query configured ratios via `/api/ratio`.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
             />
           </div>
         ) : (
@@ -363,9 +383,32 @@ export const ModelRatioForm = memo(function ModelRatioForm({
                 />
               ))}
             </div>
+
+            <FormField
+              control={form.control}
+              name='ExposeRatioEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Expose ratio API')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Allow clients to query configured ratios via `/api/ratio`.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
           </SettingsForm>
         )}
-      </div>
-    </Form>
+      </Form>
+    </div>
   )
 })

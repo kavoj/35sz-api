@@ -16,6 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import {
+  formatBillingCurrencyFromUSD,
+  getCurrencyDisplay,
+  getCurrencyLabel,
+} from '@/lib/currency'
+
 const DISPLAY_DECIMALS = 12
 const SNAP_DECIMALS = 8
 const SNAP_EPSILON = 1e-12
@@ -58,4 +64,73 @@ export function formatPricingNumber(value: unknown): string {
 
   const normalized = snapFloatDrift(num)
   return Number.parseFloat(normalized.toFixed(DISPLAY_DECIMALS)).toString()
+}
+
+function getBillingExchangeRate(): number {
+  const { config, meta } = getCurrencyDisplay()
+
+  if (meta.kind === 'tokens') {
+    return 1
+  }
+
+  if (config.quotaDisplayType === 'CNY') {
+    return config.usdExchangeRate > 0 ? config.usdExchangeRate : 1
+  }
+
+  if (config.quotaDisplayType === 'CUSTOM') {
+    return config.customCurrencyExchangeRate > 0
+      ? config.customCurrencyExchangeRate
+      : 1
+  }
+
+  return 1
+}
+
+export function usdToDisplayPricingValue(valueUsd: unknown): string {
+  const num = toNumberOrNull(valueUsd)
+  if (num === null) return ''
+
+  return (snapFloatDrift(num) * getBillingExchangeRate()).toFixed(2)
+}
+
+export function displayPricingValueToUsd(value: unknown): number | null {
+  const num = toNumberOrNull(value)
+  if (num === null) return null
+
+  const exchangeRate = getBillingExchangeRate()
+  return snapFloatDrift(exchangeRate > 0 ? num / exchangeRate : num)
+}
+
+export function formatModelPricingAmountFromUSD(valueUsd: unknown): string {
+  const num = toNumberOrNull(valueUsd)
+  if (num === null) return ''
+
+  return formatBillingCurrencyFromUSD(num, {
+    digitsLarge: 2,
+    digitsSmall: 2,
+    abbreviate: false,
+    minimumNonZero: 0,
+  })
+}
+
+export function getModelPricingCurrencyPrefix(): string {
+  const { config, meta } = getCurrencyDisplay()
+
+  if (meta.kind === 'currency') {
+    return config.quotaDisplayType === 'CNY' ? '¥' : '$'
+  }
+
+  if (meta.kind === 'custom') {
+    return meta.symbol
+  }
+
+  return '$'
+}
+
+export function getModelPricingUnitLabel(): string {
+  const { meta } = getCurrencyDisplay()
+  if (meta.kind === 'tokens') {
+    return 'USD/1M'
+  }
+  return `${getCurrencyLabel()}/1M`
 }

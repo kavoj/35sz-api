@@ -23,7 +23,9 @@ const ICON_VENDOR_NAMES: Record<string, string> = {
   Gemini: 'Google',
   Google: 'Google',
   Qwen: 'Alibaba',
+  Alibaba: 'Alibaba',
   Doubao: 'ByteDance',
+  ByteDance: 'ByteDance',
   DeepSeek: 'DeepSeek',
   Zhipu: 'Zhipu',
   Moonshot: 'Moonshot',
@@ -35,6 +37,14 @@ const ICON_VENDOR_NAMES: Record<string, string> = {
   Mistral: 'Mistral',
   Cohere: 'Cohere',
   Jina: 'Jina',
+  AWS: 'AWS',
+  Baidu: 'Baidu',
+  Cloudflare: 'Cloudflare',
+  Minimax: 'MiniMax',
+  MiniMax: 'MiniMax',
+  Spark: 'iFlytek',
+  Tencent: 'Tencent',
+  XAI: 'xAI',
 }
 
 const MODEL_VENDOR_PATTERNS: Array<[string, string]> = Object.entries({

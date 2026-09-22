@@ -41,6 +41,42 @@ type testResult struct {
 	newAPIError *types.NewAPIError
 }
 
+func isAudioTranscriptionModel(modelName string) bool {
+	name := strings.ToLower(strings.TrimSpace(modelName))
+	return (strings.Contains(name, "asr") && !strings.Contains(name, "asratchet")) || strings.Contains(name, "transcription")
+}
+
+func isVideoTaskModel(modelName string) bool {
+	name := strings.ToLower(strings.TrimSpace(modelName))
+	return strings.Contains(name, "seedance") || strings.Contains(name, "happyhorse") ||
+		strings.Contains(name, "wan") && (strings.Contains(name, "t2v") || strings.Contains(name, "i2v") || strings.Contains(name, "r2v") || strings.Contains(name, "kf2v") || strings.Contains(name, "s2v") || strings.Contains(name, "video"))
+}
+
+func shouldUseTaskChannelTest(channel *model.Channel, testModel string) bool {
+	return channel != nil && (channel.Type == constant.ChannelTypeAli || channel.Type == constant.ChannelTypeVolcEngine) && isVideoTaskModel(testModel)
+}
+
+func buildAgentPlanVideoTestRequest(modelName string) map[string]any {
+	return map[string]any{
+		"model":          modelName,
+		"content":        []map[string]interface{}{{"type": "text", "text": "channel connectivity test"}},
+		"generate_audio": false,
+		"ratio":          "adaptive",
+		"duration":       5,
+		"watermark":      false,
+	}
+}
+
+func resolveAutomaticChannelTestPath(channel *model.Channel, testModel string) string {
+	if channel != nil && channel.Type == constant.ChannelTypeAli && isVideoTaskModel(testModel) {
+		return "/v1/video/generations"
+	}
+	if channel != nil && channel.Type == constant.ChannelTypeVolcEngine && isVideoTaskModel(testModel) {
+		return "/v1/video/generations"
+	}
+	return "/v1/chat/completions"
+}
+
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {
 	normalized := strings.TrimSpace(endpointType)
 	if normalized != "" {
@@ -801,6 +837,19 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			Model: model,
 			Input: []any{"hello world"},
 		}
+	}
+
+	if channel != nil && channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(strings.ToLower(model), "seedream") {
+		return &dto.ImageRequest{
+			Model:  model,
+			Prompt: "a cute cat",
+			N:      lo.ToPtr(uint(1)),
+			Size:   "2K",
+		}
+	}
+
+	if isAudioTranscriptionModel(model) {
+		return &dto.AudioRequest{Model: model}
 	}
 
 	// Responses-only models (e.g. codex series)

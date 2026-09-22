@@ -16,77 +16,63 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type {
-  ColumnFiltersState,
-  OnChangeFn,
-  PaginationState,
-  RowSelectionState,
-  VisibilityState,
-  SortingState,
-} from '@tanstack/react-table'
-import { Copy, Plus } from 'lucide-react'
 import {
-  useState,
-  useMemo,
-  memo,
-  useCallback,
-  useEffect,
-  forwardRef,
-  useImperativeHandle,
-  useRef,
-} from 'react'
+  type ColumnDef,
+  type ColumnFiltersState,
+  type OnChangeFn,
+  type PaginationState,
+  type RowSelectionState,
+  type VisibilityState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useState, useMemo, memo, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import {
   DataTableBulkActions,
+  DataTableColumnHeader,
   DataTableToolbar,
   DataTablePagination,
-  DataTableRow,
-  DataTableView,
-  useDataTable,
 } from '@/components/data-table'
+import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
-import { useModelPricing } from '@/features/model-pricing/api'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
-  applyPricingDraft,
-  pricingOptions,
-} from '@/features/model-pricing/pricing'
-import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
-import { splitPluginBillingExprKey } from '@/features/pricing/lib/plugin-pricing'
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  combineBillingExpr,
+  splitBillingExprAndRequestRules,
+} from '@/features/pricing/lib/billing-expr'
 import { useMediaQuery } from '@/hooks'
 
 import { safeJsonParse } from '../utils/json-parser'
-import type { PricingMode } from './model-pricing-core'
 import {
   ModelPricingEditorPanel,
-  type ModelPricingEditorPanelHandle,
   ModelPricingSheet,
   type ModelRatioData,
 } from './model-pricing-sheet'
 import {
-  buildModelSnapshots,
-  getSnapshotSignature,
-  isBasePricingUnset,
-  type ModelRow,
-} from './model-pricing-snapshots'
-import {
-  buildModelRatioColumns,
-  TASK_PRICING_MODE_FILTER,
-} from './model-ratio-table-columns'
+  formatModelPricingAmountFromUSD,
+  formatPricingNumber,
+} from './pricing-format'
 
 type ModelRatioVisualEditorProps = {
-  savedModelPrice: string
-  savedModelRatio: string
-  savedCacheRatio: string
-  savedCreateCacheRatio: string
-  savedCompletionRatio: string
-  savedImageRatio: string
-  savedAudioRatio: string
-  savedAudioCompletionRatio: string
-  savedBillingMode: string
-  savedBillingExpr: string
-  savedPluginBillingExpr?: string
   modelPrice: string
   modelRatio: string
   cacheRatio: string
@@ -95,39 +81,152 @@ type ModelRatioVisualEditorProps = {
   imageRatio: string
   audioRatio: string
   audioCompletionRatio: string
+  imagePricing: string
+  videoPricing: string
+  audioInPricing: string
+  audioOutPricing: string
   billingMode: string
   billingExpr: string
-  pluginBillingExpr?: string
-  candidateModelNames?: string[]
-  candidateModelsLoading?: boolean
-  filterMode?: 'all' | 'unset'
   onChange: (field: string, value: string) => void
-  onSave: () => void | Promise<void>
-  isSaving: boolean
+  onApply?: () => Promise<void>
+  /**
+   * When true, hide model rows that only exist in the OptionMap but are
+   * NOT present in the `models` metadata table. Combined with
+   * `registeredModelNames`, this lets the admin focus on models they've
+   * intentionally added while keeping the underlying pricing OptionMap
+   * untouched (so re-enabling the filter reveals older entries again).
+   *
+   * See requirement R7a from PR-7c UX improvements.
+   */
+  filterAddedOnly?: boolean
+  /**
+   * Set of model names known to exist in the `models` metadata table.
+   * Passed down from the parent form which does the `getModels` API call.
+   * Absent (undefined) means "filter not applied" — the editor shows every
+   * row from the union of pricing OptionMap keys as before.
+   */
+  registeredModelNames?: ReadonlySet<string>
 }
 
-export type ModelRatioVisualEditorHandle = {
-  commitOpenEditor: () => Promise<boolean>
+type ModelRow = {
+  name: string
+  price?: string
+  ratio?: string
+  cacheRatio?: string
+  createCacheRatio?: string
+  completionRatio?: string
+  imageRatio?: string
+  audioRatio?: string
+  audioCompletionRatio?: string
+  imagePricing?: string
+  videoPricing?: string
+  audioInPricing?: string
+  audioOutPricing?: string
+  billingMode?: string
+  billingExpr?: string
+  requestRuleExpr?: string
+  hasConflict: boolean
 }
 
 const STORAGE_KEY = 'model-ratio-column-visibility'
 
-const ModelRatioVisualEditorComponent = forwardRef<
-  ModelRatioVisualEditorHandle,
-  ModelRatioVisualEditorProps
->(function ModelRatioVisualEditor(
-  {
-    savedModelPrice,
-    savedModelRatio,
-    savedCacheRatio,
-    savedCreateCacheRatio,
-    savedCompletionRatio,
-    savedImageRatio,
-    savedAudioRatio,
-    savedAudioCompletionRatio,
-    savedBillingMode,
-    savedBillingExpr,
-    savedPluginBillingExpr = '{}',
+const hasValue = (value?: string) => value !== undefined && value !== ''
+
+const toNumberOrNull = (value?: string) => {
+  if (!hasValue(value)) return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+const ratioToPrice = (ratio?: string, denominator?: string) => {
+  const ratioNumber = toNumberOrNull(ratio)
+  const denominatorNumber = denominator ? toNumberOrNull(denominator) : 2
+  if (ratioNumber === null || denominatorNumber === null) return ''
+  return formatPricingNumber(ratioNumber * denominatorNumber)
+}
+
+const filterBySelectedValues = (
+  rowValue: unknown,
+  filterValue: unknown
+): boolean => {
+  if (!Array.isArray(filterValue) || filterValue.length === 0) return true
+  return filterValue.includes(String(rowValue))
+}
+
+const getModeLabel = (mode?: string) => {
+  if (mode === 'per-request') return 'Per-request'
+  if (mode === 'tiered_expr') return 'Expression'
+  return 'Per-token'
+}
+
+const getModeVariant = (mode?: string): 'warning' | 'info' | 'success' => {
+  if (mode === 'per-request') return 'warning'
+  if (mode === 'tiered_expr') return 'info'
+  return 'success'
+}
+
+const getExpressionSummary = (row: ModelRow, t: (key: string) => string) => {
+  const tierCount = (row.billingExpr?.match(/tier\(/g) || []).length
+  if (tierCount > 0) {
+    return `${t('Tiered pricing')} · ${tierCount} ${t('tiers')}`
+  }
+  return t('Expression pricing')
+}
+
+const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
+  if (row.billingMode === 'tiered_expr') {
+    return getExpressionSummary(row, t)
+  }
+  if (row.billingMode === 'per-request') {
+    return row.price
+      ? `${formatModelPricingAmountFromUSD(row.price)} / ${t('request')}`
+      : t('Unset price')
+  }
+
+  const inputPrice = ratioToPrice(row.ratio)
+  if (!inputPrice) return t('Unset price')
+
+  const extraCount = [
+    row.completionRatio,
+    row.cacheRatio,
+    row.createCacheRatio,
+    row.imageRatio,
+    row.audioRatio,
+    row.audioCompletionRatio,
+  ].filter(hasValue).length
+
+  return extraCount > 0
+    ? `${t('Input')} ${formatModelPricingAmountFromUSD(inputPrice)} · ${extraCount} ${t('extras')}`
+    : `${t('Input')} ${formatModelPricingAmountFromUSD(inputPrice)}`
+}
+
+const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
+  if (row.billingMode === 'tiered_expr') {
+    return row.requestRuleExpr
+      ? t('Includes request rules')
+      : t('Expression based')
+  }
+  if (row.billingMode === 'per-request') {
+    return t('Fixed request price')
+  }
+
+  const inputPrice = ratioToPrice(row.ratio)
+  if (!inputPrice) return t('No base input price')
+
+  const details = [
+    row.completionRatio &&
+      `${t('Output')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.completionRatio, inputPrice))}`,
+    row.cacheRatio &&
+      `${t('Cache')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.cacheRatio, inputPrice))}`,
+    row.createCacheRatio &&
+      `${t('Cache write')} ${formatModelPricingAmountFromUSD(ratioToPrice(row.createCacheRatio, inputPrice))}`,
+  ].filter(Boolean)
+
+  return details.length > 0 ? details.join(' · ') : t('Base input price only')
+}
+
+export const ModelRatioVisualEditor = memo(
+  function ModelRatioVisualEditor({
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -136,698 +235,978 @@ const ModelRatioVisualEditorComponent = forwardRef<
     imageRatio,
     audioRatio,
     audioCompletionRatio,
+    imagePricing,
+    videoPricing,
+    audioInPricing,
+    audioOutPricing,
     billingMode,
     billingExpr,
-    pluginBillingExpr = '{}',
-    candidateModelNames,
-    candidateModelsLoading,
-    filterMode = 'all',
     onChange,
-    onSave,
-    isSaving,
-  },
-  ref
-) {
-  const { t } = useTranslation()
-  const { models: pricingModels } = usePricingData()
-  const isMobile = useMediaQuery('(max-width: 767px)')
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [editData, setEditData] = useState<ModelRatioData | null>(null)
-  const pricingConfig = useModelPricing(
-    editData?.name ? [editData.name] : [],
-    Boolean(editData?.name)
-  )
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const editorPanelRef = useRef<ModelPricingEditorPanelHandle>(null)
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 20,
-  })
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    () => {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        try {
-          return safeJsonParse<VisibilityState>(saved, {
-            fallback: {
+    onApply,
+    filterAddedOnly,
+    registeredModelNames,
+  }: ModelRatioVisualEditorProps) {
+    const { t } = useTranslation()
+    const isMobile = useMediaQuery('(max-width: 767px)')
+    const [sheetOpen, setSheetOpen] = useState(false)
+    const [editorOpen, setEditorOpen] = useState(false)
+    const [editData, setEditData] = useState<ModelRatioData | null>(null)
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [globalFilter, setGlobalFilter] = useState('')
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+    const [pagination, setPagination] = useState<PaginationState>({
+      pageIndex: 0,
+      pageSize: 20,
+    })
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+      () => {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) {
+          try {
+            return safeJsonParse<VisibilityState>(saved, {
+              fallback: {
+                cacheRatio: false,
+                createCacheRatio: false,
+                imageRatio: false,
+                audioRatio: false,
+                audioCompletionRatio: false,
+              },
+              silent: true,
+            })
+          } catch {
+            return {
               cacheRatio: false,
               createCacheRatio: false,
               imageRatio: false,
               audioRatio: false,
               audioCompletionRatio: false,
-            },
-            silent: true,
-          })
-        } catch {
-          return {
-            cacheRatio: false,
-            createCacheRatio: false,
-            imageRatio: false,
-            audioRatio: false,
-            audioCompletionRatio: false,
+            }
           }
         }
-      }
-      return {
-        cacheRatio: false,
-        createCacheRatio: false,
-        imageRatio: false,
-        audioRatio: false,
-        audioCompletionRatio: false,
-      }
-    }
-  )
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
-  }, [columnVisibility])
-
-  const taskModelNames = useMemo(
-    () =>
-      new Set(
-        pricingModels
-          .filter(
-            (model) =>
-              model.billing_usage_schema &&
-              Object.keys(model.billing_usage_schema).length > 0
-          )
-          .map((model) => model.model_name)
-      ),
-    [pricingModels]
-  )
-
-  const models = useMemo(() => {
-    const savedRows = buildModelSnapshots({
-      modelPrice: savedModelPrice,
-      modelRatio: savedModelRatio,
-      cacheRatio: savedCacheRatio,
-      createCacheRatio: savedCreateCacheRatio,
-      completionRatio: savedCompletionRatio,
-      imageRatio: savedImageRatio,
-      audioRatio: savedAudioRatio,
-      audioCompletionRatio: savedAudioCompletionRatio,
-      billingMode: savedBillingMode,
-      billingExpr: savedBillingExpr,
-      pluginBillingExpr: savedPluginBillingExpr,
-    })
-    const draftRows = buildModelSnapshots({
-      modelPrice,
-      modelRatio,
-      cacheRatio,
-      createCacheRatio,
-      completionRatio,
-      imageRatio,
-      audioRatio,
-      audioCompletionRatio,
-      billingMode,
-      billingExpr,
-      pluginBillingExpr,
-    })
-
-    const savedByName = new Map(savedRows.map((row) => [row.name, row]))
-    const draftByName = new Map(draftRows.map((row) => [row.name, row]))
-    const modelNames =
-      filterMode === 'unset'
-        ? new Set(candidateModelNames ?? [])
-        : new Set([...savedByName.keys(), ...draftByName.keys()])
-
-    return [...modelNames]
-      .map((name) => {
-        const saved = savedByName.get(name)
-        const draft = draftByName.get(name)
-        const displayed = saved ??
-          draft ?? { name, billingMode: 'per-token', hasConflict: false }
-        const savedSignature = getSnapshotSignature(saved)
-        const draftSignature = getSnapshotSignature(draft)
-
         return {
-          ...displayed,
-          saved,
-          draft,
-          isDraftChanged: savedSignature !== draftSignature,
-          isDraftDeleted: Boolean(saved && !draft),
-          isDraftNew: Boolean(!saved && draft),
+          cacheRatio: false,
+          createCacheRatio: false,
+          imageRatio: false,
+          audioRatio: false,
+          audioCompletionRatio: false,
         }
-      })
-      .filter((row) => !row.isDraftDeleted)
-      .filter((row) => filterMode !== 'unset' || isBasePricingUnset(row.saved))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [
-    candidateModelNames,
-    filterMode,
-    savedModelPrice,
-    savedModelRatio,
-    savedCacheRatio,
-    savedCreateCacheRatio,
-    savedCompletionRatio,
-    savedImageRatio,
-    savedAudioRatio,
-    savedAudioCompletionRatio,
-    savedBillingMode,
-    savedBillingExpr,
-    savedPluginBillingExpr,
-    modelPrice,
-    modelRatio,
-    cacheRatio,
-    createCacheRatio,
-    completionRatio,
-    imageRatio,
-    audioRatio,
-    audioCompletionRatio,
-    billingMode,
-    billingExpr,
-    pluginBillingExpr,
-  ])
-
-  const modeCounts = useMemo(() => {
-    const counts = {
-      'per-token': 0,
-      'per-request': 0,
-      tiered_expr: 0,
-      [TASK_PRICING_MODE_FILTER]: 0,
-    }
-    for (const model of models) {
-      const mode =
-        model.billingMode === 'per-request' ||
-        model.billingMode === 'tiered_expr'
-          ? model.billingMode
-          : 'per-token'
-      counts[mode] += 1
-      if (
-        taskModelNames.has(model.name) &&
-        model.billingMode === 'tiered_expr' &&
-        Boolean(model.billingExpr)
-      ) {
-        counts[TASK_PRICING_MODE_FILTER] += 1
       }
-    }
-    return counts
-  }, [models, taskModelNames])
+    )
 
-  const handleEdit = useCallback(
-    (model: ModelRow) => {
-      const editableModel = model.draft ?? model.saved ?? model
-      let editBillingMode: PricingMode = 'per-token'
-      if (editableModel.billingMode === 'tiered_expr') {
-        editBillingMode = 'tiered_expr'
-      } else if (editableModel.price && editableModel.price !== '') {
-        editBillingMode = 'per-request'
-      }
-      setEditData({
-        name: editableModel.name,
-        price: editableModel.price,
-        ratio: editableModel.ratio,
-        cacheRatio: editableModel.cacheRatio,
-        createCacheRatio: editableModel.createCacheRatio,
-        completionRatio: editableModel.completionRatio,
-        imageRatio: editableModel.imageRatio,
-        audioRatio: editableModel.audioRatio,
-        audioCompletionRatio: editableModel.audioCompletionRatio,
-        billingMode: editBillingMode,
-        billingExpr: editableModel.billingExpr,
-        pluginBillingExpr: editableModel.pluginBillingExpr,
-        requestRuleExpr: editableModel.requestRuleExpr,
-      })
-      setEditorOpen(true)
-      if (isMobile) setSheetOpen(true)
-    },
-    [isMobile]
-  )
+    useEffect(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
+    }, [columnVisibility])
 
-  const handleAdd = useCallback(() => {
-    setEditData(null)
-    setEditorOpen(true)
-    if (isMobile) setSheetOpen(true)
-  }, [isMobile])
-
-  const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
-    (updater) => {
-      setGlobalFilter((previous) => {
-        const next = typeof updater === 'function' ? updater(previous) : updater
-        if (next !== previous) {
-          setEditData(null)
-          setEditorOpen(false)
-          setSheetOpen(false)
-        }
-        return next
-      })
-    },
-    []
-  )
-
-  const handleDelete = useCallback(
-    (name: string) => {
+    const models = useMemo(() => {
       const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
         fallback: {},
-        silent: true,
+        context: 'model prices',
       })
       const ratioMap = safeJsonParse<Record<string, number>>(modelRatio, {
         fallback: {},
-        silent: true,
+        context: 'model ratios',
       })
       const cacheMap = safeJsonParse<Record<string, number>>(cacheRatio, {
         fallback: {},
-        silent: true,
+        context: 'cache ratios',
       })
       const createCacheMap = safeJsonParse<Record<string, number>>(
         createCacheRatio,
-        { fallback: {}, silent: true }
+        { fallback: {}, context: 'create cache ratios' }
       )
       const completionMap = safeJsonParse<Record<string, number>>(
         completionRatio,
-        { fallback: {}, silent: true }
+        { fallback: {}, context: 'completion ratios' }
       )
       const imageMap = safeJsonParse<Record<string, number>>(imageRatio, {
         fallback: {},
-        silent: true,
+        context: 'image ratios',
       })
       const audioMap = safeJsonParse<Record<string, number>>(audioRatio, {
         fallback: {},
-        silent: true,
+        context: 'audio ratios',
       })
       const audioCompletionMap = safeJsonParse<Record<string, number>>(
         audioCompletionRatio,
-        { fallback: {}, silent: true }
+        { fallback: {}, context: 'audio completion ratios' }
       )
+      // Structured pricing maps: each is JSON string → parsed as map of model name to structured object
+      const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+        fallback: {},
+        context: 'image generation pricing',
+      })
+      const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+        fallback: {},
+        context: 'video generation pricing',
+      })
+      const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+        fallback: {},
+        context: 'audio input pricing',
+      })
+      const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+        fallback: {},
+        context: 'audio output pricing',
+      })
       const billingModeMap = safeJsonParse<Record<string, string>>(
         billingMode,
-        { fallback: {}, silent: true }
+        {
+          fallback: {},
+          context: 'billing mode',
+        }
       )
       const billingExprMap = safeJsonParse<Record<string, string>>(
         billingExpr,
-        { fallback: {}, silent: true }
-      )
-
-      delete priceMap[name]
-      delete ratioMap[name]
-      delete cacheMap[name]
-      delete createCacheMap[name]
-      delete completionMap[name]
-      delete imageMap[name]
-      delete audioMap[name]
-      delete audioCompletionMap[name]
-      delete billingModeMap[name]
-      delete billingExprMap[name]
-      const pluginExprMap = safeJsonParse<Record<string, string>>(
-        pluginBillingExpr,
-        { fallback: {} }
-      )
-      for (const variant of Object.keys(pluginExprMap)) {
-        if (splitPluginBillingExprKey(variant)?.[1] === name) {
-          delete pluginExprMap[variant]
+        {
+          fallback: {},
+          context: 'billing expression',
         }
-      }
-      onChange(
-        'billing_setting.plugin_billing_expr',
-        JSON.stringify(pluginExprMap)
       )
 
-      onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
-      onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
-      onChange('CacheRatio', JSON.stringify(cacheMap, null, 2))
-      onChange('CreateCacheRatio', JSON.stringify(createCacheMap, null, 2))
-      onChange('CompletionRatio', JSON.stringify(completionMap, null, 2))
-      onChange('ImageRatio', JSON.stringify(imageMap, null, 2))
-      onChange('AudioRatio', JSON.stringify(audioMap, null, 2))
-      onChange(
-        'AudioCompletionRatio',
-        JSON.stringify(audioCompletionMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_mode',
-        JSON.stringify(billingModeMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_expr',
-        JSON.stringify(billingExprMap, null, 2)
-      )
+      const modelNames = new Set([
+        ...Object.keys(priceMap),
+        ...Object.keys(ratioMap),
+        ...Object.keys(cacheMap),
+        ...Object.keys(createCacheMap),
+        ...Object.keys(completionMap),
+        ...Object.keys(imageMap),
+        ...Object.keys(audioMap),
+        ...Object.keys(audioCompletionMap),
+        ...Object.keys(imagePricingMap),
+        ...Object.keys(videoPricingMap),
+        ...Object.keys(audioInPricingMap),
+        ...Object.keys(audioOutPricingMap),
+        ...Object.keys(billingModeMap),
+        ...Object.keys(billingExprMap),
+      ])
 
-      if (editData?.name === name) {
-        setEditData(null)
-        setEditorOpen(false)
-        setSheetOpen(false)
-      }
-    },
-    [
-      modelPrice,
-      modelRatio,
-      cacheRatio,
-      createCacheRatio,
-      completionRatio,
-      imageRatio,
-      audioRatio,
-      audioCompletionRatio,
-      billingMode,
-      billingExpr,
-      pluginBillingExpr,
-      onChange,
-      editData,
-    ]
-  )
+      const modelData: ModelRow[] = Array.from(modelNames).map((name) => {
+        const price = priceMap[name]?.toString() || ''
+        const ratio = ratioMap[name]?.toString() || ''
+        const cache = cacheMap[name]?.toString() || ''
+        const createCache = createCacheMap[name]?.toString() || ''
+        const completion = completionMap[name]?.toString() || ''
+        const image = imageMap[name]?.toString() || ''
+        const audio = audioMap[name]?.toString() || ''
+        const audioCompletion = audioCompletionMap[name]?.toString() || ''
+        const imagePricing = imagePricingMap[name] ? JSON.stringify(imagePricingMap[name], null, 2) : ''
+        const videoPricing = videoPricingMap[name] ? JSON.stringify(videoPricingMap[name], null, 2) : ''
+        const audioInPricing = audioInPricingMap[name] ? JSON.stringify(audioInPricingMap[name], null, 2) : ''
+        const audioOutPricing = audioOutPricingMap[name] ? JSON.stringify(audioOutPricingMap[name], null, 2) : ''
 
-  const columns = useMemo(
-    () =>
-      buildModelRatioColumns({
-        onDelete: handleDelete,
-        onEdit: handleEdit,
-        deleteDisabled: filterMode === 'unset',
-        taskModelNames,
-        t,
-      }),
-    [handleEdit, handleDelete, filterMode, t, taskModelNames]
-  )
+        const modeForModel = billingModeMap[name]
+        if (modeForModel === 'tiered_expr') {
+          // Tiered_expr models may also retain ratio/price values as fallback
+          // during multi-instance sync delays. We preserve them in the row so
+          // the edit dialog round-trip and the next save don't drop them.
+          const fullExpr = billingExprMap[name] || ''
+          const { billingExpr: pureExpr, requestRuleExpr } =
+            splitBillingExprAndRequestRules(fullExpr)
+          return {
+            name,
+            billingMode: 'tiered_expr',
+            billingExpr: pureExpr,
+            requestRuleExpr,
+            price,
+            ratio,
+            cacheRatio: cache,
+            createCacheRatio: createCache,
+            completionRatio: completion,
+            imageRatio: image,
+            audioRatio: audio,
+            audioCompletionRatio: audioCompletion,
+            imagePricing,
+            videoPricing,
+            audioInPricing,
+            audioOutPricing,
+            hasConflict: false,
+          }
+        }
 
-  const ensurePageInRange = useCallback((pageCount: number) => {
-    setPagination((prev) =>
-      pageCount > 0 && prev.pageIndex >= pageCount
-        ? { ...prev, pageIndex: pageCount - 1 }
-        : prev
-    )
-  }, [])
-
-  const { table } = useDataTable({
-    data: models,
-    columns,
-    getRowId: (row) => row.name,
-    ensurePageInRange,
-    sorting,
-    columnFilters,
-    globalFilter,
-    columnVisibility,
-    pagination,
-    rowSelection,
-    enableRowSelection: true,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: handleGlobalFilterChange,
-    onColumnVisibilityChange: setColumnVisibility,
-    onPaginationChange: setPagination,
-    onRowSelectionChange: setRowSelection,
-    autoResetPageIndex: false,
-    globalFilterFn: (row, _columnId, filterValue) => {
-      const searchValue = String(filterValue).toLowerCase()
-      return row.original.name.toLowerCase().includes(searchValue)
-    },
-  })
-
-  const persistPricingData = useCallback(
-    (data: ModelRatioData, targetNames: string[] = [data.name]) => {
-      const options = pricingOptions({
-        ModelPrice: modelPrice,
-        ModelRatio: modelRatio,
-        CompletionRatio: completionRatio,
-        CacheRatio: cacheRatio,
-        CreateCacheRatio: createCacheRatio,
-        ImageRatio: imageRatio,
-        AudioRatio: audioRatio,
-        AudioCompletionRatio: audioCompletionRatio,
-        BillingMode: billingMode,
-        BillingExpr: billingExpr,
-        PluginBillingExpr: pluginBillingExpr,
+        return {
+          name,
+          price,
+          ratio,
+          cacheRatio: cache,
+          createCacheRatio: createCache,
+          completionRatio: completion,
+          imageRatio: image,
+          audioRatio: audio,
+          audioCompletionRatio: audioCompletion,
+          imagePricing,
+          videoPricing,
+          audioInPricing,
+          audioOutPricing,
+          billingMode: price !== '' ? 'per-request' : 'per-token',
+          hasConflict:
+            price !== '' &&
+            (ratio !== '' ||
+              completion !== '' ||
+              cache !== '' ||
+              createCache !== '' ||
+              image !== '' ||
+              audio !== '' ||
+              audioCompletion !== ''),
+        }
       })
-      const updated = applyPricingDraft(options, data, targetNames)
-      for (const [key, value] of Object.entries(updated)) onChange(key, value)
-    },
-    [
+
+      // Apply the "added only" filter. When the caller passes a registered
+      // model set AND opts in via filterAddedOnly, we drop any pricing-map-only
+      // rows so the admin sees only what they've explicitly registered in the
+      // models metadata table. Filter runs BEFORE sort so pagination pages
+      // reflect the visible slice.
+      const filtered =
+        filterAddedOnly && registeredModelNames
+          ? modelData.filter((row) => registeredModelNames.has(row.name))
+          : modelData
+
+      return filtered.sort((a, b) => a.name.localeCompare(b.name))
+    }, [
       modelPrice,
       modelRatio,
-      completionRatio,
       cacheRatio,
       createCacheRatio,
+      completionRatio,
       imageRatio,
       audioRatio,
       audioCompletionRatio,
+      imagePricing,
+      videoPricing,
+      audioInPricing,
+      audioOutPricing,
       billingMode,
       billingExpr,
-      pluginBillingExpr,
-      onChange,
-    ]
-  )
-
-  const handleBatchCopy = useCallback(async () => {
-    if (!editData) {
-      toast.error(t('Open a source model first'))
-      return
-    }
-
-    let sourceData = editData
-    if (editorOpen && editorPanelRef.current) {
-      const committed = await editorPanelRef.current.commitDraft()
-      if (!committed) return
-      sourceData = committed
-      setEditData(committed)
-    }
-
-    const targetNames = table
-      .getFilteredSelectedRowModel()
-      .rows.map((row) => row.original.name)
-
-    if (targetNames.length === 0) {
-      toast.error(t('Select at least one target model'))
-      return
-    }
-
-    // Persist to the source model too, so targets never carry pricing the
-    // source itself would lose if the editor draft were abandoned.
-    persistPricingData(sourceData, [
-      ...new Set([sourceData.name, ...targetNames]),
+      filterAddedOnly,
+      registeredModelNames,
     ])
-    table.resetRowSelection()
-    toast.success(
-      t('Applied {{name}} pricing to {{count}} models', {
-        name: sourceData.name,
-        count: targetNames.length,
-      })
-    )
-  }, [editData, editorOpen, persistPricingData, t, table])
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      commitOpenEditor: async () => {
-        if (!editorOpen || !editorPanelRef.current) return true
-        const data = await editorPanelRef.current.commitDraft()
-        if (!data) return false
+    const modeCounts = useMemo(
+      () =>
+        models.reduce(
+          (acc, model) => {
+            const mode =
+              model.billingMode === 'per-request' ||
+              model.billingMode === 'tiered_expr'
+                ? model.billingMode
+                : 'per-token'
+            acc[mode] += 1
+            return acc
+          },
+          {
+            'per-token': 0,
+            'per-request': 0,
+            tiered_expr: 0,
+          } as Record<'per-token' | 'per-request' | 'tiered_expr', number>
+        ),
+      [models]
+    )
+
+    const handleEdit = useCallback(
+      (model: ModelRow) => {
+        setEditData({
+          name: model.name,
+          price: model.price,
+          ratio: model.ratio,
+          cacheRatio: model.cacheRatio,
+          createCacheRatio: model.createCacheRatio,
+          completionRatio: model.completionRatio,
+          imageRatio: model.imageRatio,
+          audioRatio: model.audioRatio,
+          audioCompletionRatio: model.audioCompletionRatio,
+          imagePricing: model.imagePricing,
+          videoPricing: model.videoPricing,
+          audioInPricing: model.audioInPricing,
+          audioOutPricing: model.audioOutPricing,
+          billingMode:
+            model.billingMode === 'tiered_expr'
+              ? 'tiered_expr'
+              : model.price && model.price !== ''
+                ? 'per-request'
+                : 'per-token',
+          billingExpr: model.billingExpr,
+          requestRuleExpr: model.requestRuleExpr,
+        })
+        setEditorOpen(true)
+        if (isMobile) setSheetOpen(true)
+      },
+      [isMobile]
+    )
+
+    const handleAdd = useCallback(() => {
+      setEditData(null)
+      setEditorOpen(true)
+      if (isMobile) setSheetOpen(true)
+    }, [isMobile])
+
+    const handleCancel = useCallback(() => {
+      setEditData(null)
+      setEditorOpen(false)
+      setSheetOpen(false)
+    }, [])
+
+    const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
+      (updater) => {
+        setGlobalFilter((previous) => {
+          const next =
+            typeof updater === 'function' ? updater(previous) : updater
+          if (next !== previous) {
+            setEditData(null)
+            setEditorOpen(false)
+            setSheetOpen(false)
+          }
+          return next
+        })
+      },
+      []
+    )
+
+    const handleDelete = useCallback(
+      (name: string) => {
+        const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
+          fallback: {},
+          silent: true,
+        })
+        const ratioMap = safeJsonParse<Record<string, number>>(modelRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const cacheMap = safeJsonParse<Record<string, number>>(cacheRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const createCacheMap = safeJsonParse<Record<string, number>>(
+          createCacheRatio,
+          { fallback: {}, silent: true }
+        )
+        const completionMap = safeJsonParse<Record<string, number>>(
+          completionRatio,
+          { fallback: {}, silent: true }
+        )
+        const imageMap = safeJsonParse<Record<string, number>>(imageRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const audioMap = safeJsonParse<Record<string, number>>(audioRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const audioCompletionMap = safeJsonParse<Record<string, number>>(
+          audioCompletionRatio,
+          { fallback: {}, silent: true }
+        )
+        const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+          fallback: {},
+          silent: true,
+        })
+        const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const billingModeMap = safeJsonParse<Record<string, string>>(
+          billingMode,
+          { fallback: {}, silent: true }
+        )
+        const billingExprMap = safeJsonParse<Record<string, string>>(
+          billingExpr,
+          { fallback: {}, silent: true }
+        )
+
+        delete priceMap[name]
+        delete ratioMap[name]
+        delete cacheMap[name]
+        delete createCacheMap[name]
+        delete completionMap[name]
+        delete imageMap[name]
+        delete audioMap[name]
+        delete audioCompletionMap[name]
+        delete imagePricingMap[name]
+        delete videoPricingMap[name]
+        delete audioInPricingMap[name]
+        delete audioOutPricingMap[name]
+        delete billingModeMap[name]
+        delete billingExprMap[name]
+
+        onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
+        onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
+        onChange('CacheRatio', JSON.stringify(cacheMap, null, 2))
+        onChange('CreateCacheRatio', JSON.stringify(createCacheMap, null, 2))
+        onChange('CompletionRatio', JSON.stringify(completionMap, null, 2))
+        onChange('ImageRatio', JSON.stringify(imageMap, null, 2))
+        onChange('AudioRatio', JSON.stringify(audioMap, null, 2))
+        onChange(
+          'AudioCompletionRatio',
+          JSON.stringify(audioCompletionMap, null, 2)
+        )
+        onChange('ImagePricing', JSON.stringify(imagePricingMap, null, 2))
+        onChange('VideoPricing', JSON.stringify(videoPricingMap, null, 2))
+        onChange('AudioInPricing', JSON.stringify(audioInPricingMap, null, 2))
+        onChange('AudioOutPricing', JSON.stringify(audioOutPricingMap, null, 2))
+        onChange(
+          'billing_setting.billing_mode',
+          JSON.stringify(billingModeMap, null, 2)
+        )
+        onChange(
+          'billing_setting.billing_expr',
+          JSON.stringify(billingExprMap, null, 2)
+        )
+      },
+      [
+        modelPrice,
+        modelRatio,
+        cacheRatio,
+        createCacheRatio,
+        completionRatio,
+        imageRatio,
+        audioRatio,
+        audioCompletionRatio,
+        imagePricing,
+        videoPricing,
+        audioInPricing,
+        audioOutPricing,
+        billingMode,
+        billingExpr,
+        onChange,
+      ]
+    )
+
+    const columns = useMemo<ColumnDef<ModelRow>[]>(() => {
+      return [
+        {
+          id: 'select',
+          header: ({ table }) => (
+            <Checkbox
+              checked={table.getIsAllPageRowsSelected()}
+              indeterminate={table.getIsSomePageRowsSelected()}
+              onCheckedChange={(value) =>
+                table.toggleAllPageRowsSelected(!!value)
+              }
+              aria-label={t('Select all')}
+              className='translate-y-[2px]'
+            />
+          ),
+          cell: ({ row }) => (
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label={t('Select row')}
+              className='translate-y-[2px]'
+            />
+          ),
+          enableSorting: false,
+          enableHiding: false,
+          meta: { label: t('Select') },
+        },
+        {
+          accessorKey: 'name',
+          header: ({ column }) => (
+            <DataTableColumnHeader column={column} title={t('Model name')} />
+          ),
+          cell: ({ row }) => (
+            <div className='flex items-center gap-2 font-medium'>
+              {row.getValue('name')}
+              {row.original.billingMode === 'tiered_expr' && (
+                <StatusBadge
+                  label={t('Tiered')}
+                  variant='info'
+                  copyable={false}
+                />
+              )}
+              {row.original.hasConflict && (
+                <StatusBadge
+                  label={t('Conflict')}
+                  variant='danger'
+                  copyable={false}
+                />
+              )}
+            </div>
+          ),
+          enableHiding: false,
+        },
+        {
+          accessorKey: 'billingMode',
+          header: ({ column }) => (
+            <DataTableColumnHeader column={column} title={t('Mode')} />
+          ),
+          cell: ({ row }) => (
+            <StatusBadge
+              label={t(getModeLabel(row.original.billingMode))}
+              variant={getModeVariant(row.original.billingMode)}
+              copyable={false}
+            />
+          ),
+          filterFn: (row, id, value) =>
+            filterBySelectedValues(row.getValue(id), value),
+          meta: { label: t('Mode') },
+        },
+        {
+          id: 'priceSummary',
+          header: ({ column }) => (
+            <DataTableColumnHeader column={column} title={t('Price summary')} />
+          ),
+          cell: ({ row }) => (
+            <div className='flex min-w-[180px] flex-col gap-1'>
+              <span className='font-medium'>
+                {getPriceSummary(row.original, t)}
+              </span>
+              <span className='text-muted-foreground max-w-[320px] truncate text-xs'>
+                {getPriceDetail(row.original, t)}
+              </span>
+            </div>
+          ),
+          sortingFn: (rowA, rowB) =>
+            getPriceSummary(rowA.original, t).localeCompare(
+              getPriceSummary(rowB.original, t)
+            ),
+          meta: { label: t('Price summary') },
+        },
+        {
+          id: 'actions',
+          cell: ({ row }) => (
+            <div className='flex justify-end gap-2'>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleEdit(row.original)}
+              >
+                <Pencil />
+              </Button>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => handleDelete(row.original.name)}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ),
+          enableHiding: false,
+        },
+      ]
+    }, [handleEdit, handleDelete, t])
+
+    const table = useReactTable({
+      data: models,
+      columns,
+      state: {
+        sorting,
+        columnFilters,
+        globalFilter,
+        columnVisibility,
+        pagination,
+        rowSelection,
+      },
+      enableRowSelection: true,
+      onSortingChange: setSorting,
+      onColumnFiltersChange: setColumnFilters,
+      onGlobalFilterChange: handleGlobalFilterChange,
+      onColumnVisibilityChange: setColumnVisibility,
+      onPaginationChange: setPagination,
+      onRowSelectionChange: setRowSelection,
+      autoResetPageIndex: false,
+      getCoreRowModel: getCoreRowModel(),
+      getFilteredRowModel: getFilteredRowModel(),
+      getSortedRowModel: getSortedRowModel(),
+      getPaginationRowModel: getPaginationRowModel(),
+      getFacetedRowModel: getFacetedRowModel(),
+      getFacetedUniqueValues: getFacetedUniqueValues(),
+      globalFilterFn: (row, _columnId, filterValue) => {
+        const searchValue = String(filterValue).toLowerCase()
+        return row.original.name.toLowerCase().includes(searchValue)
+      },
+    })
+
+    const persistPricingData = useCallback(
+      (data: ModelRatioData, targetNames: string[] = [data.name]) => {
+        const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
+          fallback: {},
+          silent: true,
+        })
+        const ratioMap = safeJsonParse<Record<string, number>>(modelRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const cacheMap = safeJsonParse<Record<string, number>>(cacheRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const createCacheMap = safeJsonParse<Record<string, number>>(
+          createCacheRatio,
+          { fallback: {}, silent: true }
+        )
+        const completionMap = safeJsonParse<Record<string, number>>(
+          completionRatio,
+          { fallback: {}, silent: true }
+        )
+        const imageMap = safeJsonParse<Record<string, number>>(imageRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const audioMap = safeJsonParse<Record<string, number>>(audioRatio, {
+          fallback: {},
+          silent: true,
+        })
+        const audioCompletionMap = safeJsonParse<Record<string, number>>(
+          audioCompletionRatio,
+          { fallback: {}, silent: true }
+        )
+        // Structured pricing maps: map of model name → structured pricing object
+        const imagePricingMap = safeJsonParse<Record<string, any>>(imagePricing, {
+          fallback: {},
+          silent: true,
+        })
+        const videoPricingMap = safeJsonParse<Record<string, any>>(videoPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioInPricingMap = safeJsonParse<Record<string, any>>(audioInPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const audioOutPricingMap = safeJsonParse<Record<string, any>>(audioOutPricing, {
+          fallback: {},
+          silent: true,
+        })
+        const billingModeMap = safeJsonParse<Record<string, string>>(
+          billingMode,
+          { fallback: {}, silent: true }
+        )
+        const billingExprMap = safeJsonParse<Record<string, string>>(
+          billingExpr,
+          { fallback: {}, silent: true }
+        )
+
+        const setIfPresent = (
+          target: Record<string, number>,
+          name: string,
+          value: string | undefined
+        ) => {
+          if (!value || value === '') return
+          const parsed = parseFloat(value)
+          if (Number.isFinite(parsed)) target[name] = parsed
+        }
+
+        targetNames.forEach((name) => {
+          delete priceMap[name]
+          delete ratioMap[name]
+          delete cacheMap[name]
+          delete createCacheMap[name]
+          delete completionMap[name]
+          delete imageMap[name]
+          delete audioMap[name]
+          delete audioCompletionMap[name]
+          delete imagePricingMap[name]
+          delete videoPricingMap[name]
+          delete audioInPricingMap[name]
+          delete audioOutPricingMap[name]
+          delete billingModeMap[name]
+          delete billingExprMap[name]
+
+          // Parse and store structured pricing if present
+          if (data.imagePricing && data.imagePricing !== '') {
+            try {
+              const parsed = JSON.parse(data.imagePricing)
+              imagePricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.videoPricing && data.videoPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.videoPricing)
+              videoPricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.audioInPricing && data.audioInPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.audioInPricing)
+              audioInPricingMap[name] = parsed
+            } catch {}
+          }
+          if (data.audioOutPricing && data.audioOutPricing !== '') {
+            try {
+              const parsed = JSON.parse(data.audioOutPricing)
+              audioOutPricingMap[name] = parsed
+            } catch {}
+          }
+
+          if (data.billingMode === 'tiered_expr') {
+            const combined = combineBillingExpr(
+              data.billingExpr || '',
+              data.requestRuleExpr || ''
+            )
+            if (combined) {
+              billingModeMap[name] = 'tiered_expr'
+              billingExprMap[name] = combined
+            }
+            // Always serialize ratio/price values for tiered_expr models so they
+            // serve as fallback during multi-instance sync delays. The backend's
+            // ModelPriceHelper checks billing_mode first, so these values are
+            // only consulted when billing_setting hasn't propagated yet.
+            setIfPresent(priceMap, name, data.price)
+            setIfPresent(ratioMap, name, data.ratio)
+            setIfPresent(cacheMap, name, data.cacheRatio)
+            setIfPresent(createCacheMap, name, data.createCacheRatio)
+            setIfPresent(completionMap, name, data.completionRatio)
+            setIfPresent(imageMap, name, data.imageRatio)
+            setIfPresent(audioMap, name, data.audioRatio)
+            setIfPresent(audioCompletionMap, name, data.audioCompletionRatio)
+          } else if (data.price && data.price !== '') {
+            setIfPresent(priceMap, name, data.price)
+          } else {
+            setIfPresent(ratioMap, name, data.ratio)
+            setIfPresent(cacheMap, name, data.cacheRatio)
+            setIfPresent(createCacheMap, name, data.createCacheRatio)
+            setIfPresent(completionMap, name, data.completionRatio)
+            setIfPresent(imageMap, name, data.imageRatio)
+            setIfPresent(audioMap, name, data.audioRatio)
+            setIfPresent(audioCompletionMap, name, data.audioCompletionRatio)
+          }
+        })
+
+        onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
+        onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
+        onChange('CacheRatio', JSON.stringify(cacheMap, null, 2))
+        onChange('CreateCacheRatio', JSON.stringify(createCacheMap, null, 2))
+        onChange('CompletionRatio', JSON.stringify(completionMap, null, 2))
+        onChange('ImageRatio', JSON.stringify(imageMap, null, 2))
+        onChange('AudioRatio', JSON.stringify(audioMap, null, 2))
+        onChange(
+          'AudioCompletionRatio',
+          JSON.stringify(audioCompletionMap, null, 2)
+        )
+        onChange('ImagePricing', JSON.stringify(imagePricingMap, null, 2))
+        onChange('VideoPricing', JSON.stringify(videoPricingMap, null, 2))
+        onChange('AudioInPricing', JSON.stringify(audioInPricingMap, null, 2))
+        onChange('AudioOutPricing', JSON.stringify(audioOutPricingMap, null, 2))
+        onChange(
+          'billing_setting.billing_mode',
+          JSON.stringify(billingModeMap, null, 2)
+        )
+        onChange(
+          'billing_setting.billing_expr',
+          JSON.stringify(billingExprMap, null, 2)
+        )
+      },
+      [
+        modelPrice,
+        modelRatio,
+        cacheRatio,
+        createCacheRatio,
+        completionRatio,
+        imageRatio,
+        audioRatio,
+        audioCompletionRatio,
+        imagePricing,
+        videoPricing,
+        audioInPricing,
+        audioOutPricing,
+        billingMode,
+        billingExpr,
+        onChange,
+      ]
+    )
+
+    const handleSave = useCallback(
+      async (data: ModelRatioData) => {
         persistPricingData(data)
         setEditData(data)
-        return true
+        setEditorOpen(true)
+        await onApply?.()
+        toast.success(
+          t('Model prices saved successfully')
+        )
       },
-    }),
-    [editorOpen, persistPricingData]
-  )
+      [onApply, persistPricingData, t]
+    )
 
-  const hasRows = table.getRowModel().rows.length > 0
+    const handleBatchCopy = useCallback(() => {
+      if (!editData) {
+        toast.error(t('Open a source model first'))
+        return
+      }
 
-  let emptyStateText = t('No models configured. Use Add model to get started.')
-  if (table.getState().globalFilter) {
-    emptyStateText = t('No models match your search')
-  } else if (filterMode === 'unset') {
-    emptyStateText = candidateModelsLoading
-      ? t('Loading...')
-      : t('No models with unset prices')
-  }
+      const targetNames = table
+        .getFilteredSelectedRowModel()
+        .rows.map((row) => row.original.name)
 
-  return (
-    <div className='flex min-h-0 flex-1 flex-col gap-4'>
-      <div
-        role='region'
-        aria-label={t('Model prices')}
-        className='grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(300px,0.72fr)_minmax(520px,1.28fr)] xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'
-      >
-        <div className='flex min-h-0 min-w-0 flex-col gap-3'>
-          <DataTableToolbar
-            table={table}
-            searchPlaceholder={t('Search models...')}
-            searchDebounceMs={250}
-            filters={[
-              {
-                columnId: 'billingMode',
-                title: t('Mode'),
-                options: [
-                  {
-                    label: 'Per-token (deprecated)',
-                    value: 'per-token',
-                    count: modeCounts['per-token'],
-                  },
-                  {
-                    label: 'Per-request (deprecated)',
-                    value: 'per-request',
-                    count: modeCounts['per-request'],
-                  },
-                  {
-                    label: 'Expression',
-                    value: 'tiered_expr',
-                    count: modeCounts.tiered_expr,
-                  },
-                  {
-                    label: 'Expression - Task pricing',
-                    value: TASK_PRICING_MODE_FILTER,
-                    count: modeCounts[TASK_PRICING_MODE_FILTER],
-                  },
-                ],
-              },
-            ]}
-            preActions={
-              filterMode === 'unset' ? undefined : (
+      if (targetNames.length === 0) {
+        toast.error(t('Select at least one target model'))
+        return
+      }
+
+      persistPricingData(editData, targetNames)
+      table.resetRowSelection()
+      toast.success(
+        t('Applied {{name}} pricing to {{count}} models', {
+          name: editData.name,
+          count: targetNames.length,
+        })
+      )
+    }, [editData, persistPricingData, t, table])
+
+    const selectedTargetCount = table.getFilteredSelectedRowModel().rows.length
+
+    return (
+      <div className='flex flex-col gap-4'>
+        <div className='grid min-h-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] xl:grid-cols-[minmax(0,1.1fr)_minmax(520px,0.9fr)]'>
+          <div className='flex min-w-0 flex-col gap-4'>
+            <DataTableToolbar
+              table={table}
+              searchPlaceholder={t('Search models...')}
+              filters={[
+                {
+                  columnId: 'billingMode',
+                  title: t('Mode'),
+                  options: [
+                    {
+                      label: 'Per-token',
+                      value: 'per-token',
+                      count: modeCounts['per-token'],
+                    },
+                    {
+                      label: 'Per-request',
+                      value: 'per-request',
+                      count: modeCounts['per-request'],
+                    },
+                    {
+                      label: 'Expression',
+                      value: 'tiered_expr',
+                      count: modeCounts.tiered_expr,
+                    },
+                  ],
+                },
+              ]}
+              preActions={
                 <Button onClick={handleAdd}>
                   <Plus data-icon='inline-start' />
                   {t('Add model')}
                 </Button>
-              )
-            }
-          />
-
-          {!hasRows ? (
-            <div className='text-muted-foreground rounded-lg border border-dashed p-8 text-center'>
-              {emptyStateText}
-            </div>
-          ) : (
-            <DataTableView
-              table={table}
-              containerClassName='min-h-0 flex-1 rounded-md'
-              tableContainerClassName='h-full'
-              tableClassName='min-w-[852px] table-fixed'
-              tableHeaderClassName='[&_tr]:border-b-0'
-              splitHeaderScrollClassName='h-full'
-              bodyContainerClassName='[scrollbar-gutter:stable]'
-              splitHeader
-              pinnedColumns={[
-                {
-                  columnId: 'actions',
-                  side: 'right',
-                },
-              ]}
-              colgroup={
-                <colgroup>
-                  <col className='w-9' />
-                  <col className='w-[300px]' />
-                  <col className='w-[120px]' />
-                  <col className='w-[300px]' />
-                  <col className='w-auto' />
-                </colgroup>
               }
-              renderRow={(row, { getCellClassName }) => (
-                <DataTableRow
-                  key={row.id}
-                  row={row}
-                  className={
-                    editData?.name === row.original.name
-                      ? 'bg-muted/45 hover:bg-muted/50 data-[state=selected]:bg-muted group'
-                      : 'group'
-                  }
-                  getColumnClassName={(columnId) =>
-                    columnId === 'actions' &&
-                    editData?.name === row.original.name
-                      ? getCellClassName(columnId, 'bg-muted')
-                      : getCellClassName(columnId)
-                  }
-                  onClick={(event) => {
-                    const target = event.target as HTMLElement
-                    if (target.closest('button, [role="checkbox"]')) return
-                    handleEdit(row.original)
-                  }}
-                />
-              )}
             />
-          )}
 
-          {hasRows && <DataTablePagination table={table} />}
-        </div>
-
-        <div className='hidden min-h-0 min-w-0 md:block'>
-          {editorOpen ? (
-            <ModelPricingEditorPanel
-              ref={editorPanelRef}
-              editData={editData}
-              pluginVariants={
-                pricingConfig.data?.entries.find(
-                  (entry) => entry.model_name === editData?.name
-                )?.plugin_variants
-              }
-              usageSchema={
-                pricingConfig.data?.entries.find(
-                  (entry) => entry.model_name === editData?.name
-                )?.usage_schema
-              }
-              onSave={onSave}
-              isSaving={isSaving}
-              className='h-full min-h-0'
-            />
-          ) : (
-            <div className='bg-card text-muted-foreground flex h-full min-h-0 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center'>
-              <div className='text-foreground text-base font-medium'>
-                {t('Select a model to edit pricing')}
+            {table.getRowModel().rows.length === 0 ? (
+              <div className='text-muted-foreground rounded-lg border border-dashed p-8 text-center'>
+                {table.getState().globalFilter
+                  ? t('No models match your search')
+                  : t('No models configured. Use Add model to get started.')}
               </div>
-              <p className='max-w-sm text-sm'>
-                {t(
-                  'Use the full-width table to scan prices, then select a row to edit it here.'
-                )}
-              </p>
-              {filterMode !== 'unset' && (
+            ) : (
+              <div className='overflow-hidden rounded-md border'>
+                <Table>
+                  <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} colSpan={header.colSpan}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={
+                          row.getIsSelected() ? 'selected' : undefined
+                        }
+                        className={
+                          editData?.name === row.original.name
+                            ? 'bg-muted/45'
+                            : undefined
+                        }
+                        onClick={(event) => {
+                          const target = event.target as HTMLElement
+                          if (target.closest('button, [role="checkbox"]'))
+                            return
+                          handleEdit(row.original)
+                        }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {table.getRowModel().rows.length > 0 && (
+              <DataTablePagination table={table} />
+            )}
+          </div>
+
+          <div className='hidden min-w-0 md:block'>
+            {editorOpen ? (
+              <ModelPricingEditorPanel
+                onSave={handleSave}
+                onCancel={handleCancel}
+                editData={editData}
+                selectedTargetCount={selectedTargetCount}
+                className='sticky top-4 h-[calc(100vh-8rem)] min-h-[620px]'
+              />
+            ) : (
+              <div className='bg-card text-muted-foreground sticky top-4 flex h-[calc(100vh-8rem)] min-h-[420px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center'>
+                <div className='text-foreground text-base font-medium'>
+                  {t('Select a model to edit pricing')}
+                </div>
+                <p className='max-w-sm text-sm'>
+                  {t(
+                    'Use the full-width table to scan prices, then select a row to edit it here.'
+                  )}
+                </p>
                 <Button variant='outline' onClick={handleAdd}>
                   <Plus data-icon='inline-start' />
                   {t('Add model')}
                 </Button>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
+
+        <DataTableBulkActions table={table} entityName={t('model')}>
+          <Button size='sm' disabled={!editData} onClick={handleBatchCopy}>
+            <Copy data-icon='inline-start' />
+            {editData
+              ? t('Copy {{name}} pricing', { name: editData.name })
+              : t('Open a source model first')}
+          </Button>
+        </DataTableBulkActions>
+
+        {isMobile && (
+          <ModelPricingSheet
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            editData={editData}
+            selectedTargetCount={selectedTargetCount}
+          />
+        )}
       </div>
-
-      <DataTableBulkActions table={table} entityName={t('model')}>
-        <Button size='sm' disabled={!editData} onClick={handleBatchCopy}>
-          <Copy data-icon='inline-start' />
-          {editData
-            ? t('Copy {{name}} pricing', { name: editData.name })
-            : t('Open a source model first')}
-        </Button>
-      </DataTableBulkActions>
-
-      {isMobile && (
-        <ModelPricingSheet
-          ref={editorPanelRef}
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          editData={editData}
-          pluginVariants={
-            pricingConfig.data?.entries.find(
-              (entry) => entry.model_name === editData?.name
-            )?.plugin_variants
-          }
-          usageSchema={
-            pricingConfig.data?.entries.find(
-              (entry) => entry.model_name === editData?.name
-            )?.usage_schema
-          }
-          onSave={onSave}
-          isSaving={isSaving}
-        />
-      )}
-    </div>
-  )
-})
-
-export const ModelRatioVisualEditor = memo(
-  ModelRatioVisualEditorComponent,
+    )
+  },
   // Custom equality check - only re-render if JSON props actually changed
   (prevProps, nextProps) => {
     return (
-      prevProps.savedModelPrice === nextProps.savedModelPrice &&
-      prevProps.savedModelRatio === nextProps.savedModelRatio &&
-      prevProps.savedCacheRatio === nextProps.savedCacheRatio &&
-      prevProps.savedCreateCacheRatio === nextProps.savedCreateCacheRatio &&
-      prevProps.savedCompletionRatio === nextProps.savedCompletionRatio &&
-      prevProps.savedImageRatio === nextProps.savedImageRatio &&
-      prevProps.savedAudioRatio === nextProps.savedAudioRatio &&
-      prevProps.savedAudioCompletionRatio ===
-        nextProps.savedAudioCompletionRatio &&
-      prevProps.savedBillingMode === nextProps.savedBillingMode &&
-      prevProps.savedBillingExpr === nextProps.savedBillingExpr &&
-      prevProps.savedPluginBillingExpr === nextProps.savedPluginBillingExpr &&
       prevProps.modelPrice === nextProps.modelPrice &&
       prevProps.modelRatio === nextProps.modelRatio &&
       prevProps.cacheRatio === nextProps.cacheRatio &&
@@ -838,13 +1217,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.audioCompletionRatio === nextProps.audioCompletionRatio &&
       prevProps.billingMode === nextProps.billingMode &&
       prevProps.billingExpr === nextProps.billingExpr &&
-      prevProps.pluginBillingExpr === nextProps.pluginBillingExpr &&
-      prevProps.candidateModelNames === nextProps.candidateModelNames &&
-      prevProps.candidateModelsLoading === nextProps.candidateModelsLoading &&
-      prevProps.filterMode === nextProps.filterMode &&
-      prevProps.onChange === nextProps.onChange &&
-      prevProps.onSave === nextProps.onSave &&
-      prevProps.isSaving === nextProps.isSaving
+      prevProps.onChange === nextProps.onChange
     )
   }
 )

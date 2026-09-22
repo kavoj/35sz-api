@@ -106,6 +106,7 @@ function MultiplierEditor(props: MultiplierEditorProps) {
 type EditorProps<T> = {
   value: T
   onChange: (value: T) => void
+  currencyLabel?: string
 }
 
 export function ImagePricingEditor(props: EditorProps<ImagePricing>) {
@@ -113,7 +114,9 @@ export function ImagePricingEditor(props: EditorProps<ImagePricing>) {
   return (
     <div className='space-y-4'>
       <PriceInput
-        label={t('Base price per image (USD)')}
+        label={t('Base price per image ({{currency}})', {
+          currency: props.currencyLabel ?? 'USD',
+        })}
         value={props.value.price_per_image}
         onChange={(value) =>
           props.onChange({ ...props.value, price_per_image: value })
@@ -142,7 +145,9 @@ export function VideoPricingEditor(props: EditorProps<VideoPricing>) {
   return (
     <div className='space-y-4'>
       <PriceInput
-        label={t('Base price per second (USD)')}
+        label={t('Base price per second ({{currency}})', {
+          currency: props.currencyLabel ?? 'USD',
+        })}
         value={props.value.price_per_second}
         onChange={(value) =>
           props.onChange({ ...props.value, price_per_second: value })
@@ -171,7 +176,9 @@ export function AudioInPricingEditor(props: EditorProps<AudioInPricing>) {
   return (
     <div className='space-y-4'>
       <PriceInput
-        label={t('Price per minute (USD)')}
+        label={t('Price per minute ({{currency}})', {
+          currency: props.currencyLabel ?? 'USD',
+        })}
         value={props.value.price_per_minute}
         onChange={(value) =>
           props.onChange({ ...props.value, price_per_minute: value })
@@ -193,7 +200,9 @@ export function AudioOutPricingEditor(props: EditorProps<AudioOutPricing>) {
   return (
     <div className='space-y-4'>
       <PriceInput
-        label={t('Price per 1M characters (USD)')}
+        label={t('Price per 1M characters ({{currency}})', {
+          currency: props.currencyLabel ?? 'USD',
+        })}
         value={props.value.price_per_million_chars}
         onChange={(value) =>
           props.onChange({ ...props.value, price_per_million_chars: value })
