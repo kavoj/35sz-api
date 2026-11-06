@@ -76,7 +76,11 @@ import { modelsQueryKeys, vendorsQueryKeys } from '../../lib'
 import {
   modelFormSchema,
   inferModelPricingKind,
+  inferModelCategories,
   modelTypeForPricingKind,
+  MODEL_CATEGORIES,
+  MODEL_CATEGORY_LABEL_KEYS,
+  type ModelCategory,
   PRICING_KINDS,
   MODEL_FORM_DEFAULT_VALUES,
   transformModelToFormDefaults,
@@ -145,6 +149,7 @@ export function ModelMutateDrawer(props: {
   })
   const savedModel = modelQuery.data ?? currentRow
   const suggestedMetadata = inferModelPricingKind(form.watch('model_name'))
+  const suggestedCategories = inferModelCategories(form.watch('model_name'))
 
   useEffect(() => {
     if (!props.open) return
@@ -342,6 +347,13 @@ export function ModelMutateDrawer(props: {
                                   form.setValue('tags', inferred.tags, {
                                     shouldDirty: true,
                                   })
+                                  if (!form.getValues('model_types')?.length) {
+                                    form.setValue(
+                                      'model_types',
+                                      inferModelCategories(field.value),
+                                      { shouldDirty: true }
+                                    )
+                                  }
                                   form.setValue(
                                     'model_type',
                                     modelTypeForPricingKind(inferred.kind),
@@ -446,6 +458,62 @@ export function ModelMutateDrawer(props: {
 
                       <FormField
                         control={form.control}
+                        name='model_types'
+                        render={({ field }) => {
+                          const selected = field.value ?? []
+                          return (
+                            <FormItem>
+                              <FormLabel>{t('Model types')}</FormLabel>
+                              <FormControl>
+                                <div
+                                  className='flex flex-wrap gap-2'
+                                  role='group'
+                                  aria-label={t('Model types')}
+                                >
+                                  {MODEL_CATEGORIES.map((category) => {
+                                    const isOn = selected.includes(category)
+                                    return (
+                                      <Button
+                                        key={category}
+                                        type='button'
+                                        size='sm'
+                                        variant={isOn ? 'default' : 'outline'}
+                                        aria-pressed={isOn}
+                                        onClick={() => {
+                                          const next = isOn
+                                            ? selected.filter(
+                                                (item) => item !== category
+                                              )
+                                            : [...selected, category]
+                                          const applied: ModelCategory[] =
+                                            next.length > 0 ? next : ['text']
+                                          field.onChange(applied)
+                                          form.setValue(
+                                            'model_type',
+                                            applied[0],
+                                            { shouldDirty: true }
+                                          )
+                                        }}
+                                      >
+                                        {t(MODEL_CATEGORY_LABEL_KEYS[category])}
+                                      </Button>
+                                    )
+                                  })}
+                                </div>
+                              </FormControl>
+                              <FormDescription>
+                                {t(
+                                  'Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.'
+                                )}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )
+                        }}
+                      />
+
+                      <FormField
+                        control={form.control}
                         name='tags'
                         render={({ field }) => (
                           <FormItem>
@@ -474,6 +542,11 @@ export function ModelMutateDrawer(props: {
                                     form.setValue(
                                       'tags',
                                       suggestedMetadata.tags,
+                                      { shouldDirty: true }
+                                    )
+                                    form.setValue(
+                                      'model_types',
+                                      suggestedCategories,
                                       { shouldDirty: true }
                                     )
                                     form.setValue(

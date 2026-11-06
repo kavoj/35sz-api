@@ -7781,6 +7781,8 @@
     "Vendor path": "Đường dẫn nhà cung cấp",
     "Vertex AI API version must be v1 or v1beta1": "Phiên bản API Vertex AI phải là v1 hoặc v1beta1",
     "{{count}} unsaved price changes": "{{count}} thay đổi giá chưa lưu",
-    "{{name}}: {{reason}}": "{{name}}: {{reason}}"
+    "{{name}}: {{reason}}": "{{name}}: {{reason}}",
+    "Model types": "Loại mô hình",
+    "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.": "Chọn mọi loại mà mô hình này phục vụ. Lựa chọn này quyết định cách tính giá và phạm vi API của mô hình."
   }
 }

@@ -7781,6 +7781,8 @@
     "Vendor path": "Chemin du fournisseur",
     "Vertex AI API version must be v1 or v1beta1": "La version de l'API Vertex AI doit être v1 ou v1beta1",
     "{{count}} unsaved price changes": "{{count}} modifications de prix non enregistrées",
-    "{{name}}: {{reason}}": "{{name}} : {{reason}}"
+    "{{name}}: {{reason}}": "{{name}} : {{reason}}",
+    "Model types": "Types de modèle",
+    "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.": "Sélectionnez toutes les catégories servies par ce modèle. Ce choix détermine le schéma de facturation et l'interface API du modèle."
   }
 }

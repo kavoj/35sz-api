@@ -70,6 +70,82 @@ export function inferModelPricingKind(name: string): {
   return { kind: 'chat', tags: ['chat'] }
 }
 
+/** Categories a model can serve, in the order the picker shows them. */
+export const MODEL_CATEGORIES = [
+  'text',
+  'audio',
+  'image',
+  'video',
+  'embedding',
+] as const
+
+export type ModelCategory = (typeof MODEL_CATEGORIES)[number]
+
+/** i18n keys for the picker; the English key is the source string. */
+export const MODEL_CATEGORY_LABEL_KEYS: Record<ModelCategory, string> = {
+  text: 'Text',
+  audio: 'Audio',
+  image: 'Image',
+  video: 'Video',
+  embedding: 'Embedding',
+}
+
+const IMAGE_CATEGORY_PATTERN =
+  /seedream|dall[-_]?e|gpt-image|flux|midjourney|stable-diffusion|qwen-image|vision|(?:^|[-_])vl(?:[-_]|$)/
+const VIDEO_CATEGORY_PATTERN =
+  /seedance|sora|kling|veo|happyhorse|(?:^|[-_])(?:i2v|t2v|r2v)(?:[-_]|$)/
+const AUDIO_CATEGORY_PATTERN =
+  /whisper|transcri|(?:^|[-_])asr(?:[-_]|$)|^tts(?:[-_]|$)|text[-_]?to[-_]?speech|seed[-_]?tts|speech|audio|suno|music/
+const EMBEDDING_CATEGORY_PATTERN =
+  /embedding|embed(?:[-_]|$)|rerank|(?:^|[-_])bge[-_]/
+
+/**
+ * Guess every category a model serves from its name. The picker pre-selects
+ * these, and the user can add or remove any of them before saving, so this is
+ * a starting point rather than a rule.
+ */
+export function inferModelCategories(name: string): ModelCategory[] {
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return ['text']
+
+  const categories: ModelCategory[] = []
+  if (EMBEDDING_CATEGORY_PATTERN.test(normalized)) return ['embedding']
+  if (IMAGE_CATEGORY_PATTERN.test(normalized)) categories.push('image')
+  if (VIDEO_CATEGORY_PATTERN.test(normalized)) categories.push('video')
+  if (AUDIO_CATEGORY_PATTERN.test(normalized)) categories.push('audio')
+  // Anything a chat endpoint can call also reads and writes text, which keeps
+  // multimodal models selectable for text-only routes.
+  if (categories.length === 0 || !VIDEO_CATEGORY_PATTERN.test(normalized)) {
+    categories.unshift('text')
+  }
+  return MODEL_CATEGORIES.filter((category) => categories.includes(category))
+}
+
+/** Split the stored comma-separated value into canonical categories. */
+export function parseModelTypes(value: string | null | undefined): ModelCategory[] {
+  if (!value) return []
+  const tokens = value
+    .split(',')
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean)
+  return MODEL_CATEGORIES.filter((category) =>
+    tokens.includes(category)
+  )
+}
+
+export function formatModelTypes(categories: ModelCategory[]): string {
+  return MODEL_CATEGORIES.filter((category) =>
+    categories.includes(category)
+  ).join(',')
+}
+
+/** The single-valued `model_type` column mirrors the first selected category. */
+export function primaryCategory(
+  categories: ModelCategory[]
+): NonNullable<Model['model_type']> {
+  return categories[0] ?? 'text'
+}
+
 export function modelTypeForPricingKind(
   kind: PricingKind
 ): NonNullable<Model['model_type']> {
@@ -96,6 +172,7 @@ export const modelFormSchema = z.object({
   model_type: z
     .enum(['text', 'embedding', 'image', 'file', 'audio', 'video'])
     .default('text'),
+  model_types: z.array(z.enum(MODEL_CATEGORIES)).default(['text']),
   pricing_kind: z.enum(PRICING_KINDS).default('chat'),
   vendor_id: z.number(),
   endpoints: z.string().default(''),
@@ -114,6 +191,7 @@ export const MODEL_FORM_DEFAULT_VALUES: ModelFormValues = {
   icon: '',
   tags: [],
   model_type: 'text',
+  model_types: ['text'],
   pricing_kind: 'chat',
   vendor_id: 0,
   endpoints: '',
@@ -159,6 +237,15 @@ export function transformModelToFormDefaults(model: Model): ModelFormValues {
     model_type:
       model.model_type ??
       modelTypeForPricingKind(inferModelPricingKind(model.model_name).kind),
+    model_types:
+      parseModelTypes(model.model_types).length > 0
+        ? parseModelTypes(model.model_types)
+        : [
+            (model.model_type ??
+              modelTypeForPricingKind(
+                inferModelPricingKind(model.model_name).kind
+              )) as ModelCategory,
+          ],
     pricing_kind: PRICING_KINDS.includes(model.pricing_kind as PricingKind)
       ? (model.pricing_kind as PricingKind)
       : inferModelPricingKind(model.model_name).kind,
@@ -186,6 +273,7 @@ export function transformFormDataToModelPayload(
     tags: formatTagsArray(formData.tags),
     pricing_kind: formData.pricing_kind,
     model_type: formData.model_type,
+    model_types: formatModelTypes(formData.model_types),
     vendor_id: formData.vendor_id,
     endpoints: formData.endpoints || '',
     name_rule: formData.name_rule,

@@ -16,7 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export const CHANNEL_CONNECTION_INFO_TYPE = 'newapi_channel_conn'
+export const CHANNEL_CONNECTION_INFO_TYPE = 'suixing_channel_conn'
+
+/** Blobs exported by builds that still carried the upstream name. */
+const LEGACY_CONNECTION_INFO_TYPES = new Set([
+  CHANNEL_CONNECTION_INFO_TYPE,
+  'newapi_channel_conn',
+])
 
 export type ChannelConnectionInfo = {
   key: string
@@ -44,7 +50,8 @@ export function parseChannelConnectionInfo(
     const parsed: unknown = JSON.parse(text.trim())
     if (
       isRecord(parsed) &&
-      parsed._type === CHANNEL_CONNECTION_INFO_TYPE &&
+      typeof parsed._type === 'string' &&
+      LEGACY_CONNECTION_INFO_TYPES.has(parsed._type) &&
       typeof parsed.key === 'string' &&
       typeof parsed.url === 'string'
     ) {

@@ -28,6 +28,48 @@ const (
 	ModelTypeVideo     = "video"
 )
 
+// canonicalModelTypes fixes the order categories are stored in, so equal
+// selections always serialize identically.
+var canonicalModelTypes = []string{
+	ModelTypeText,
+	ModelTypeAudio,
+	ModelTypeImage,
+	ModelTypeVideo,
+	ModelTypeEmbedding,
+	ModelTypeFile,
+}
+
+// NormalizeModelTypes canonicalizes a comma separated category list: unknown
+// tokens are dropped, duplicates collapse, and the result keeps a stable order.
+func NormalizeModelTypes(modelTypes string) string {
+	selected := make(map[string]bool, len(canonicalModelTypes))
+	for raw := range strings.SplitSeq(modelTypes, ",") {
+		if token := strings.ToLower(strings.TrimSpace(raw)); token != "" {
+			selected[NormalizeModelType(token)] = true
+		}
+	}
+	if len(selected) == 0 {
+		return ModelTypeText
+	}
+	ordered := make([]string, 0, len(selected))
+	for _, candidate := range canonicalModelTypes {
+		if selected[candidate] {
+			ordered = append(ordered, candidate)
+		}
+	}
+	return strings.Join(ordered, ",")
+}
+
+// PrimaryModelType picks the representative category for single-valued fields.
+func PrimaryModelType(modelTypes string) string {
+	for candidate := range strings.SplitSeq(modelTypes, ",") {
+		if token := strings.TrimSpace(candidate); token != "" {
+			return NormalizeModelType(token)
+		}
+	}
+	return ModelTypeText
+}
+
 func NormalizeModelType(modelType string) string {
 	switch strings.ToLower(strings.TrimSpace(modelType)) {
 	case ModelTypeEmbedding:
@@ -66,6 +108,10 @@ type Model struct {
 	Icon               string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
 	Tags               string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
 	ModelType          string         `json:"model_type" gorm:"type:varchar(32);not null;default:'text'"`
+	// ModelTypes holds every category a model serves, comma separated and
+	// ordered by the canonical list. ModelType stays the primary one so
+	// routing and filters keep working unchanged.
+	ModelTypes         string         `json:"model_types,omitempty" gorm:"type:varchar(128)"`
 	VendorID           int            `json:"vendor_id,omitempty" gorm:"index"`
 	Endpoints          string         `json:"endpoints,omitempty" gorm:"type:text"`
 	SupportedEndpoints []string       `json:"supported_endpoints,omitempty" gorm:"-"`

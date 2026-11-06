@@ -17,13 +17,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export const THEME_STORAGE_KEYS = {
-  mode: 'newapi:theme:v1:mode',
-  preset: 'newapi:theme:v1:preset',
-  font: 'newapi:theme:v1:font',
-  radius: 'newapi:theme:v1:radius',
-  scale: 'newapi:theme:v1:scale',
-  contentLayout: 'newapi:theme:v1:content-layout',
+  mode: 'suixing:theme:v1:mode',
+  preset: 'suixing:theme:v1:preset',
+  font: 'suixing:theme:v1:font',
+  radius: 'suixing:theme:v1:radius',
+  scale: 'suixing:theme:v1:scale',
+  contentLayout: 'suixing:theme:v1:content-layout',
 } as const
+
+/**
+ * Keys written by earlier builds. Visitors keep their preference instead of
+ * being reset on the first paint after the namespace change; each value is
+ * copied to the new key and the old one is dropped.
+ */
+const LEGACY_THEME_STORAGE_KEYS: Record<string, string> = Object.fromEntries(
+  Object.values(THEME_STORAGE_KEYS).map((key) => [
+    key,
+    key.replace('suixing:', 'newapi:'),
+  ])
+)
 
 export function readThemePreference<T extends string>(
   key: string,
@@ -35,7 +47,18 @@ export function readThemePreference<T extends string>(
   try {
     // Legacy cookies are shared across ports, so importing them would restore
     // preferences that may belong to another local instance.
-    const value = window.localStorage.getItem(key)
+    let value = window.localStorage.getItem(key)
+    if (!value) {
+      const legacyKey = LEGACY_THEME_STORAGE_KEYS[key]
+      const legacyValue = legacyKey
+        ? window.localStorage.getItem(legacyKey)
+        : null
+      if (legacyValue) {
+        window.localStorage.setItem(key, legacyValue)
+        window.localStorage.removeItem(legacyKey as string)
+        value = legacyValue
+      }
+    }
     return value && allowed.has(value as T) ? (value as T) : fallback
   } catch {
     return fallback

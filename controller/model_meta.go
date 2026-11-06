@@ -119,7 +119,11 @@ func CreateModelMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	m.ModelType = model.NormalizeModelType(m.ModelType)
+	if strings.TrimSpace(m.ModelTypes) == "" {
+		m.ModelTypes = m.ModelType
+	}
+	m.ModelTypes = model.NormalizeModelTypes(m.ModelTypes)
+	m.ModelType = model.PrimaryModelType(m.ModelTypes)
 	// 名称冲突检查
 	if dup, err := model.IsModelNameDuplicated(0, m.ModelName); err != nil {
 		common.ApiError(c, err)
@@ -151,7 +155,11 @@ func UpdateModelMeta(c *gin.Context) {
 		common.ApiErrorT(c, "Missing model ID")
 		return
 	}
-	m.ModelType = model.NormalizeModelType(m.ModelType)
+	if strings.TrimSpace(m.ModelTypes) == "" {
+		m.ModelTypes = m.ModelType
+	}
+	m.ModelTypes = model.NormalizeModelTypes(m.ModelTypes)
+	m.ModelType = model.PrimaryModelType(m.ModelTypes)
 
 	if statusOnly {
 		if m.Status != 0 && m.Status != 1 {

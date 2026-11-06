@@ -7803,6 +7803,8 @@
     "Vendor path": "Vendor path",
     "Vertex AI API version must be v1 or v1beta1": "Vertex AI API version must be v1 or v1beta1",
     "{{count}} unsaved price changes": "{{count}} unsaved price changes",
-    "{{name}}: {{reason}}": "{{name}}: {{reason}}"
+    "{{name}}: {{reason}}": "{{name}}: {{reason}}",
+    "Model types": "Model types",
+    "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.": "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model."
   }
 }

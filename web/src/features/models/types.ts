@@ -54,6 +54,8 @@ export interface Model {
   tags?: string
   /** Inferred/overridable model type, backed by `model_meta.model_type`. */
   model_type?: ModelType
+  /** Every category the model serves, comma separated (multi-select). */
+  model_types?: string
   vendor_id?: number
   endpoints?: string
   supported_endpoints?: string[]

@@ -7781,6 +7781,8 @@
     "Vendor path": "ベンダーのパス",
     "Vertex AI API version must be v1 or v1beta1": "Vertex AI の API バージョンは v1 または v1beta1 である必要があります",
     "{{count}} unsaved price changes": "未保存 {{count}} 件",
-    "{{name}}: {{reason}}": "{{name}}：{{reason}}"
+    "{{name}}: {{reason}}": "{{name}}：{{reason}}",
+    "Model types": "モデル種別",
+    "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.": "このモデルが提供する種別をすべて選択してください。選択内容は課金方式と API 仕様に反映されます。"
   }
 }

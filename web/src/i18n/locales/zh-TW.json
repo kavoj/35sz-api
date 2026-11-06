@@ -7781,6 +7781,8 @@
     "Vendor path": "廠商路徑",
     "Vertex AI API version must be v1 or v1beta1": "Vertex AI API 版本只能是 v1 或 v1beta1",
     "{{count}} unsaved price changes": "{{count}} 項未儲存",
-    "{{name}}: {{reason}}": "{{name}}：{{reason}}"
+    "{{name}}: {{reason}}": "{{name}}：{{reason}}",
+    "Model types": "模型類型",
+    "Select every category this model serves. The selection drives the pricing schema and the API surface described for the model.": "選擇該模型支援的全部類型。選擇結果會決定定價模式，以及該模型對外提供的介面定義。"
   }
 }
